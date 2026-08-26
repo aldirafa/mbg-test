@@ -1,0 +1,183 @@
+// Skema Prisma - Sistem MBG Digital Triangulasi
+// Cakupan: MVP (Bagian 6.1-6.3 Concept Note + Bagian 5 Dokumen Teknis)
+// Entitas Fase 2 (feedback_anak, rating, pengaduan) sengaja belum dimasukkan
+// -- ditambahkan saat Fase 2 dikerjakan, sesuai roadmap Bagian 11.2.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  sppg
+  sekolah
+  orangtua
+  dinas
+  admin
+}
+
+enum StatusDistribusi {
+  dikirim
+  diterima
+  bermasalah
+}
+
+enum StatusTerimaAnak {
+  diterima
+  tidak_diterima
+  ada_masalah
+}
+
+enum StatusFlag {
+  terbuka
+  ditindaklanjuti
+  selesai
+}
+
+model User {
+  id           String   @id @default(cuid())
+  nama         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  sppg      Sppg?
+  sekolah   Sekolah?
+  orangtua  Orangtua?
+
+  @@map("users")
+}
+
+model Sppg {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  namaSppg    String   @map("nama_sppg")
+  alamat      String
+  kontak      String?
+  statusAktif Boolean  @default(true) @map("status_aktif")
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sekolahList Sekolah[]
+  menuHarian  MenuHarian[]
+
+  @@map("sppg")
+}
+
+model Sekolah {
+  id           String @id @default(cuid())
+  userId       String @unique @map("user_id")
+  namaSekolah  String @map("nama_sekolah")
+  alamat       String
+  sppgId       String @map("sppg_id")
+  jumlahSiswa  Int?   @map("jumlah_siswa")
+  // Lokasi sekolah, dipakai sbg titik acuan geo-gate Child Voice Interface (Fase 2)
+  lat          Float?
+  lng          Float?
+
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sppg   Sppg      @relation(fields: [sppgId], references: [id])
+  siswa  Siswa[]
+  distribusi Distribusi[]
+
+  @@map("sekolah")
+}
+
+model Orangtua {
+  id         String  @id @default(cuid())
+  userId     String  @unique @map("user_id")
+  nama       String
+  noWa       String? @map("no_wa")
+  verifiedWa Boolean @default(false) @map("verified_wa")
+
+  user  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  siswa Siswa[]
+
+  @@map("orangtua")
+}
+
+model Siswa {
+  id         String  @id @default(cuid())
+  sekolahId  String  @map("sekolah_id")
+  nama       String
+  nisNisn    String  @unique @map("nis_nisn")
+  kelas      String?
+  orangtuaId String? @map("orangtua_id")
+
+  sekolah             Sekolah              @relation(fields: [sekolahId], references: [id])
+  orangtua            Orangtua?            @relation(fields: [orangtuaId], references: [id])
+  konfirmasiOrangtua  KonfirmasiOrangtua[]
+
+  @@map("siswa")
+}
+
+model MenuHarian {
+  id            String   @id @default(cuid())
+  sppgId        String   @map("sppg_id")
+  tanggal       DateTime @db.Date
+  deskripsi     String
+  fotoUrl       String?  @map("foto_url")
+  // Geotag = bukti lokasi produksi/pengiriman (evidence), BUKAN gate akses
+  geotagKirimLat Float?  @map("geotag_kirim_lat")
+  geotagKirimLng Float?  @map("geotag_kirim_lng")
+  jumlahPorsi   Int      @map("jumlah_porsi")
+
+  sppg        Sppg         @relation(fields: [sppgId], references: [id])
+  distribusi  Distribusi[]
+
+  @@map("menu_harian")
+}
+
+model Distribusi {
+  id               String            @id @default(cuid())
+  menuId           String            @map("menu_id")
+  sekolahId        String            @map("sekolah_id")
+  status           StatusDistribusi  @default(dikirim)
+  waktuKirim       DateTime?         @map("waktu_kirim")
+  waktuTerima      DateTime?         @map("waktu_terima")
+  porsiDiterima    Int?              @map("porsi_diterima")
+  fotoTerimaUrl    String?           @map("foto_terima_url")
+  // Geotag = bukti lokasi (evidence), BUKAN gate akses -- beda peran dgn feedback_anak (Fase 2)
+  geotagTerimaLat  Float?            @map("geotag_terima_lat")
+  geotagTerimaLng  Float?            @map("geotag_terima_lng")
+
+  menu               MenuHarian           @relation(fields: [menuId], references: [id])
+  sekolah            Sekolah              @relation(fields: [sekolahId], references: [id])
+  konfirmasiOrangtua KonfirmasiOrangtua[]
+  flagTriangulasi    FlagTriangulasi[]
+
+  @@map("distribusi")
+}
+
+model KonfirmasiOrangtua {
+  id           String            @id @default(cuid())
+  distribusiId String            @map("distribusi_id")
+  siswaId      String            @map("siswa_id")
+  statusTerima StatusTerimaAnak  @map("status_terima")
+  catatan      String?
+  fotoUrl      String?           @map("foto_url")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  distribusi Distribusi @relation(fields: [distribusiId], references: [id])
+  siswa      Siswa      @relation(fields: [siswaId], references: [id])
+
+  @@map("konfirmasi_orangtua")
+}
+
+// Dihasilkan oleh job triangulasi otomatis (bandingkan SPPG - Sekolah - Orangtua)
+model FlagTriangulasi {
+  id                  String     @id @default(cuid())
+  distribusiId        String     @map("distribusi_id")
+  jenisKetidaksesuaian String    @map("jenis_ketidaksesuaian")
+  detail              String
+  status              StatusFlag @default(terbuka)
+  createdAt           DateTime   @default(now()) @map("created_at")
+
+  distribusi Distribusi @relation(fields: [distribusiId], references: [id])
+
+  @@map("flag_triangulasi")
+}
