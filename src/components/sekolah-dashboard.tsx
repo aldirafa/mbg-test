@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DashboardShell } from "@/components/dashboard-shell";
 
 type Distribusi = {
   id: string;
@@ -11,6 +12,7 @@ type Distribusi = {
     tanggal: string;
     deskripsi: string;
     jumlahPorsi: number;
+    fotoUrl: string | null;
     sppg: { namaSppg: string };
   };
 };
@@ -21,6 +23,7 @@ type RowState = {
   copied?: boolean;
   komplainOpen?: boolean;
   komplainText?: string;
+  fotoOpen?: boolean;
   busy?: boolean;
 };
 
@@ -95,142 +98,160 @@ export function SekolahDashboard() {
   }
 
   return (
-    <main className="max-w-lg mx-auto p-6 space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Portal Sekolah</h1>
-        <p className="text-sm text-neutral-500">Konfirmasi distribusi masuk &amp; bagikan info ke orangtua.</p>
-      </div>
+    <DashboardShell title="Portal Sekolah" subtitle="Konfirmasi distribusi & bagikan info ke orangtua">
+      <main className="max-w-lg mx-auto p-6 space-y-4">
+        {loading && <p className="text-sm text-neutral-500">Memuat...</p>}
+        {!loading && list.length === 0 && (
+          <p className="text-sm text-neutral-500">Belum ada distribusi masuk.</p>
+        )}
 
-      {loading && <p className="text-sm text-neutral-500">Memuat...</p>}
-      {!loading && list.length === 0 && (
-        <p className="text-sm text-neutral-500">Belum ada distribusi masuk.</p>
-      )}
-
-      <div className="space-y-4">
-        {list.map((d) => {
-          const rs = rowState[d.id] ?? {};
-          return (
-            <div key={d.id} className="border border-neutral-200 rounded-lg p-4 text-sm space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-medium">{d.menu.sppg.namaSppg}</div>
-                  <div className="text-neutral-500">{d.menu.deskripsi}</div>
-                  <div className="text-neutral-400 text-xs mt-1">
-                    {new Date(d.menu.tanggal).toLocaleDateString("id-ID", {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                    })}{" "}
-                    &middot; {d.menu.jumlahPorsi} porsi
+        <div className="space-y-4">
+          {list.map((d) => {
+            const rs = rowState[d.id] ?? {};
+            return (
+              <div key={d.id} className="border border-neutral-200 rounded-lg p-4 text-sm space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium">{d.menu.sppg.namaSppg}</div>
+                    <div className="text-neutral-500">{d.menu.deskripsi}</div>
+                    <div className="text-neutral-400 text-xs mt-1">
+                      {new Date(d.menu.tanggal).toLocaleDateString("id-ID", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                      })}{" "}
+                      &middot; {d.menu.jumlahPorsi} porsi
+                    </div>
                   </div>
-                </div>
-                <span
-                  className={
-                    "text-xs rounded-full px-2.5 py-1 whitespace-nowrap " +
-                    (d.status === "diterima"
-                      ? "bg-green-100 text-green-700"
-                      : d.status === "bermasalah"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-amber-100 text-amber-700")
-                  }
-                >
-                  {STATUS_LABEL[d.status] ?? d.status}
-                </span>
-              </div>
-
-              {d.status === "dikirim" && (
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="number"
-                    className="w-24 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
-                    placeholder={String(d.menu.jumlahPorsi)}
-                    value={rs.porsiInput ?? ""}
-                    onChange={(e) => patchRow(d.id, { porsiInput: e.target.value })}
-                  />
-                  <button
-                    disabled={rs.busy}
-                    onClick={() => confirmTerima(d)}
-                    className="flex-1 rounded-md bg-neutral-900 text-white text-sm font-medium py-2 disabled:opacity-60"
+                  <span
+                    className={
+                      "text-xs rounded-full px-2.5 py-1 whitespace-nowrap " +
+                      (d.status === "diterima"
+                        ? "bg-green-100 text-green-700"
+                        : d.status === "bermasalah"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-amber-100 text-amber-700")
+                    }
                   >
-                    Konfirmasi Terima
-                  </button>
+                    {STATUS_LABEL[d.status] ?? d.status}
+                  </span>
                 </div>
-              )}
 
-              {d.status === "diterima" && (
-                <div className="space-y-2">
-                  <div className="text-xs text-neutral-500">
-                    Dikonfirmasi {d.porsiDiterima ?? "?"}/{d.menu.jumlahPorsi} porsi.
-                  </div>
-                  {!rs.pesanText && (
+                {d.menu.fotoUrl && (
+                  <div>
                     <button
-                      onClick={() => generatePesan(d)}
-                      className="w-full rounded-md bg-neutral-900 text-white text-sm font-medium py-2"
-                    >
-                      Generate Pesan Siap-Bagi
-                    </button>
-                  )}
-                  {rs.pesanText && (
-                    <>
-                      <pre className="whitespace-pre-wrap bg-neutral-50 border border-dashed border-neutral-300 rounded-md p-3 text-xs">
-                        {rs.pesanText}
-                      </pre>
-                      <button
-                        onClick={() => copyPesan(d.id)}
-                        className="w-full rounded-md border border-neutral-300 text-sm font-medium py-2"
-                      >
-                        {rs.copied ? "Tersalin!" : "Salin Teks"}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {d.status === "bermasalah" && d.catatan && (
-                <p className="text-xs text-red-600">Catatan: {d.catatan}</p>
-              )}
-
-              {d.status !== "bermasalah" && (
-                <div>
-                  {!rs.komplainOpen && (
-                    <button
-                      onClick={() => patchRow(d.id, { komplainOpen: true })}
+                      onClick={() => patchRow(d.id, { fotoOpen: !rs.fotoOpen })}
                       className="text-xs text-neutral-500 underline"
                     >
-                      Ajukan komplain
+                      {rs.fotoOpen ? "Sembunyikan foto" : "Lihat foto menu"}
                     </button>
-                  )}
-                  {rs.komplainOpen && (
-                    <div className="space-y-2 mt-1">
-                      <textarea
-                        className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm min-h-16"
-                        placeholder="Contoh: ayam kurang matang di beberapa porsi..."
-                        value={rs.komplainText ?? ""}
-                        onChange={(e) => patchRow(d.id, { komplainText: e.target.value })}
+                    {rs.fotoOpen && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={d.menu.fotoUrl}
+                        alt={`Foto menu: ${d.menu.deskripsi}`}
+                        className="mt-2 w-full max-h-56 object-cover rounded-md border border-neutral-200"
                       />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => patchRow(d.id, { komplainOpen: false })}
-                          className="flex-1 rounded-md border border-neutral-300 text-sm py-1.5"
-                        >
-                          Batal
-                        </button>
-                        <button
-                          disabled={rs.busy}
-                          onClick={() => submitKomplain(d)}
-                          className="flex-1 rounded-md bg-neutral-900 text-white text-sm py-1.5 disabled:opacity-60"
-                        >
-                          Kirim
-                        </button>
-                      </div>
+                    )}
+                  </div>
+                )}
+
+                {d.status === "dikirim" && (
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="number"
+                      className="w-24 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+                      placeholder={String(d.menu.jumlahPorsi)}
+                      value={rs.porsiInput ?? ""}
+                      onChange={(e) => patchRow(d.id, { porsiInput: e.target.value })}
+                    />
+                    <button
+                      disabled={rs.busy}
+                      onClick={() => confirmTerima(d)}
+                      className="flex-1 rounded-md bg-neutral-900 text-white text-sm font-medium py-2 disabled:opacity-60"
+                    >
+                      Konfirmasi Terima
+                    </button>
+                  </div>
+                )}
+
+                {d.status === "diterima" && (
+                  <div className="space-y-2">
+                    <div className="text-xs text-neutral-500">
+                      Dikonfirmasi {d.porsiDiterima ?? "?"}/{d.menu.jumlahPorsi} porsi.
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </main>
+                    {!rs.pesanText && (
+                      <button
+                        onClick={() => generatePesan(d)}
+                        className="w-full rounded-md bg-neutral-900 text-white text-sm font-medium py-2"
+                      >
+                        Generate Pesan Siap-Bagi
+                      </button>
+                    )}
+                    {rs.pesanText && (
+                      <>
+                        <pre className="whitespace-pre-wrap bg-neutral-50 border border-dashed border-neutral-300 rounded-md p-3 text-xs">
+                          {rs.pesanText}
+                        </pre>
+                        <button
+                          onClick={() => copyPesan(d.id)}
+                          className="w-full rounded-md border border-neutral-300 text-sm font-medium py-2"
+                        >
+                          {rs.copied ? "Tersalin!" : "Salin Teks"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {d.status === "bermasalah" && d.catatan && (
+                  <p className="text-xs text-red-600">Catatan: {d.catatan}</p>
+                )}
+
+                {/* Komplain cuma relevan sebelum dikonfirmasi -- begitu "Diterima" dipencet,
+                    asumsinya udah gapapa. Kalau "Bermasalah" ya udah dilaporkan lewat situ. */}
+                {d.status === "dikirim" && (
+                  <div>
+                    {!rs.komplainOpen && (
+                      <button
+                        onClick={() => patchRow(d.id, { komplainOpen: true })}
+                        className="text-xs text-neutral-500 underline"
+                      >
+                        Ajukan komplain
+                      </button>
+                    )}
+                    {rs.komplainOpen && (
+                      <div className="space-y-2 mt-1">
+                        <textarea
+                          className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm min-h-16"
+                          placeholder="Contoh: ayam kurang matang di beberapa porsi..."
+                          value={rs.komplainText ?? ""}
+                          onChange={(e) => patchRow(d.id, { komplainText: e.target.value })}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => patchRow(d.id, { komplainOpen: false })}
+                            className="flex-1 rounded-md border border-neutral-300 text-sm py-1.5"
+                          >
+                            Batal
+                          </button>
+                          <button
+                            disabled={rs.busy}
+                            onClick={() => submitKomplain(d)}
+                            className="flex-1 rounded-md bg-neutral-900 text-white text-sm py-1.5 disabled:opacity-60"
+                          >
+                            Kirim
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </main>
+    </DashboardShell>
   );
 }
