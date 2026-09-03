@@ -144,6 +144,10 @@ model Distribusi {
   // Geotag = bukti lokasi (evidence), BUKAN gate akses -- beda peran dgn feedback_anak (Fase 2)
   geotagTerimaLat  Float?            @map("geotag_terima_lat")
   geotagTerimaLng  Float?            @map("geotag_terima_lng")
+  // Catatan singkat sekolah saat menandai status jadi bermasalah (mis. porsi kurang,
+  // kualitas menurun). Komplain ringkas per-distribusi -- bukan sistem pengaduan trackable
+  // penuh (itu entitas pengaduan, Fase 2, Bagian 6.5).
+  catatan          String?
 
   menu               MenuHarian           @relation(fields: [menuId], references: [id])
   sekolah            Sekolah              @relation(fields: [sekolahId], references: [id])

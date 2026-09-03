@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "next": "16.3.3",
@@ -16,7 +17,8 @@
     "@prisma/client": "^6",
     "bcryptjs": "^3",
     "next-auth": "5.0.0-beta.29",
-    "zod": "^4"
+    "zod": "^4",
+    "@supabase/supabase-js": "^2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -27,6 +29,10 @@
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "prisma": "^6"
+    "prisma": "^6",
+    "tsx": "^4"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
