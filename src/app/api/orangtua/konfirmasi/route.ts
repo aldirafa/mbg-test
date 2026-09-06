@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { checkTriangulasi } from "@/lib/triangulasi";
 
 const bodySchema = z.object({
   distribusiId: z.string(),
@@ -46,6 +47,8 @@ export async function POST(req: Request) {
     : await prisma.konfirmasiOrangtua.create({
         data: { distribusiId, siswaId, statusTerima, catatan },
       });
+
+  await checkTriangulasi(distribusiId);
 
   return NextResponse.json({ konfirmasi });
 }

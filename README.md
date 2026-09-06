@@ -69,12 +69,13 @@ src/
     sppg/          # portal SPPG - unggah menu & distribusi
     sekolah/       # portal Sekolah - konfirmasi & pesan siap-bagi
     orangtua/      # dashboard Orangtua - konfirmasi anak menerima makan
-    dinas/         # dashboard Dinas/Admin - flag triangulasi (masih placeholder)
+    dinas/         # dashboard Dinas/Admin - lihat & tindak lanjuti flag triangulasi
     api/
       auth/[...nextauth]/   # route handler Auth.js
       sppg/menu, sppg/distribusi
       sekolah/distribusi, sekolah/konfirmasi, sekolah/komplain, sekolah/pesan-harian
       orangtua/menu-hari-ini, orangtua/konfirmasi
+      dinas/flags, dinas/flags/[id]
   components/      # client component per dashboard peran + session provider
   auth.ts          # config Auth.js lengkap (Credentials provider + Prisma)
   auth.config.ts   # config edge-safe dipakai proxy.ts (tanpa Prisma)
@@ -83,6 +84,7 @@ src/
     prisma.ts        # Prisma Client singleton
     storage.ts        # upload foto ke Supabase Storage
     auth-helpers.ts    # requireRole() -- guard role per halaman server component
+    triangulasi.ts     # job pembanding 3 laporan -- lihat "Job triangulasi" di bawah
   types/next-auth.d.ts  # augmentasi tipe role & id di Session/JWT
 prisma/
   schema.prisma    # skema DB cakupan MVP (Bagian 5 Dokumen Teknis)
@@ -109,21 +111,59 @@ diterima/ditindaklanjuti/selesai dan bisa dari orangtua juga.
    ada masalah.
 3. Login sebagai Orangtua (`orangtua@mbgdigital.test`) -> lihat menu hari ini
    anaknya -> konfirmasi anak menerima makan atau lapor masalah.
-4. Login sebagai Dinas (`dinas@mbgdigital.test`) -> halaman masih placeholder,
-   job triangulasi otomatis & dashboard flag belum dibangun (lihat "Belum
-   dikerjakan").
+4. Login sebagai Dinas (`dinas@mbgdigital.test`) -> lihat daftar flag
+   triangulasi (kalau ada), filter per status, klik buat lihat detail &
+   tandai ditindaklanjuti/selesai. Buat munculin flag: ajukan komplain
+   sebagai Sekolah, atau bikin >=3 akun Orangtua konfirmasi "tidak
+   diterima"/"ada masalah" pada distribusi yang sama (lihat "Job
+   triangulasi" di bawah buat aturan lengkapnya).
 
 Password semua akun seed sama, dicetak di terminal setelah `npm run db:seed`.
 
+## Job triangulasi (Fase 5)
+
+Inti pembeda sistem ini (Bagian 4 & 6.2 Concept Note, Bagian 5.4/6.2 Dokumen
+Teknis): bandingkan laporan SPPG, Sekolah & Orangtua, lalu tandai kasus yang
+gak sinkron ke `flag_triangulasi` buat ditindaklanjuti Dinas.
+
+Diimplementasikan sebagai **write-time trigger** (`src/lib/triangulasi.ts`,
+fungsi `checkTriangulasi()`) -- dipanggil langsung tiap ada laporan baru yang
+relevan, bukan cron terjadwal. Dipanggil dari dua tempat:
+
+- `POST /api/sekolah/komplain` (sekolah ajukan komplain)
+- `POST /api/orangtua/konfirmasi` (orangtua konfirmasi/lapor masalah)
+
+Dua aturan MVP saat ini (disepakati bareng user, detail ambang batas belum
+dirinci di dokumen konsep/teknis -- ini keputusan implementasi):
+
+1. **Komplain sekolah** -- begitu sekolah menandai distribusi `bermasalah`
+   (lewat form komplain), langsung dibikin flag jenis "Komplain kualitas
+   dari sekolah".
+2. **Selisih laporan orangtua** -- kalau >=20% dari orangtua yang SUDAH
+   konfirmasi (bukan dari total siswa terdaftar) bilang "tidak
+   diterima"/"ada masalah" utk 1 distribusi yang sama, dibikin flag jenis
+   "Selisih laporan penerimaan". Syarat minimal 3 konfirmasi dulu sebelum
+   aturan ini dicek, supaya 1 laporan tunggal (1/1 = 100%) belum langsung
+   nge-flag saat data masih sangat sedikit.
+
+Flag yang statusnya masih "terbuka" akan diperbarui detailnya kalau job
+jalan lagi (mis. jumlah laporan bertambah), tapi flag yang udah
+"ditindaklanjuti"/"selesai" gak diutak-atik lagi -- biar kerjaan Dinas yang
+udah jalan gak kereset.
+
+Dashboard Dinas (`/dinas`) menampilkan semua flag, bisa difilter per status,
+dan Dinas bisa majuin status flag terbuka -> ditindaklanjuti -> selesai
+(linear, belum ada tombol mundur di MVP ini).
+
 ## Belum dikerjakan (langkah berikutnya)
 
-- **Job triangulasi otomatis** (Bagian 5, Fase 5 roadmap teknis) -- inti
-  pembeda sistem ini, bandingkan laporan SPPG/Sekolah/Orangtua & bikin
-  `flag_triangulasi` otomatis kalau gak sinkron. Belum ada sama sekali.
-- **Dashboard Dinas** -- masih placeholder, perlu tampilkan & kelola flag
-  triangulasi (setelah job triangulasi di atas jalan).
 - Proteksi role per halaman sudah ada (`requireRole()`), tapi belum ada
   halaman "tidak diizinkan" yang jelas -- sekarang cuma redirect diam-diam.
+- Ambang batas & aturan job triangulasi di atas masih judgment call MVP --
+  perlu dievaluasi ulang bareng Prof Elly/tim Dinas begitu pilot jalan
+  (mis. apa 20%/minimal 3 konfirmasi udah pas, atau perlu jenis flag
+  tambahan seperti "foto bukti gak sesuai jadwal" yang ada di wireframe
+  awal tapi belum diimplementasi).
 - Fase 2 (Bagian 11.2): rating SPPG, kanal pengaduan trackable, dashboard
   transparansi publik, Child Voice Interface -- menyusul setelah pilot MVP
   jalan.

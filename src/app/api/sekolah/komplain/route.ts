@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { checkTriangulasi } from "@/lib/triangulasi";
 
 const bodySchema = z.object({
   distribusiId: z.string(),
@@ -43,6 +44,8 @@ export async function POST(req: Request) {
     },
     include: { menu: { include: { sppg: true } } },
   });
+
+  await checkTriangulasi(distribusi.id);
 
   return NextResponse.json({ distribusi });
 }
