@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { jarakMeter, RADIUS_GEOFENCE_METER } from "@/lib/geo";
+import { checkTriangulasi } from "@/lib/triangulasi";
 
 // Child Voice Interface (Fase 2, Bagian 6.7 Concept Note & Bagian 3.3 Dok Teknis).
 // PUBLIK -- tanpa login, diakses lewat QR di lingkungan sekolah. NIS/NISN di sini CUMA
@@ -76,6 +77,8 @@ export async function POST(req: Request) {
       lokasiTerverifikasi,
     },
   });
+
+  await checkTriangulasi(distribusi.id);
 
   return NextResponse.json({ ok: true });
 }

@@ -148,7 +148,9 @@ Fitur Fase 2 yang bisa langsung dites juga:
 
 5. Buka `/suara-anak` (gak perlu login) -> masukin NIS/NISN siswa seed
    (`1234567890`, Bilqis) -> isi feedback emoji -> kirim. Coba isi 2x buat
-   lihat pesan "udah ngisi hari ini".
+   lihat pesan "udah ngisi hari ini". Kalau diisi catatan perbaikan, cek
+   dashboard Dinas -> flag baru jenis "Catatan dari anak (CVI)" langsung
+   muncul.
 6. Buka `/transparansi` (gak perlu login) -> lihat angka agregat.
 7. Di dashboard Sekolah/Orangtua, coba widget "Kasih rating" & panel
    "Pengaduan" -> cek hasilnya muncul di dashboard SPPG (rating: agregat aja;
@@ -165,23 +167,40 @@ gak sinkron ke `flag_triangulasi` buat ditindaklanjuti Dinas.
 
 Diimplementasikan sebagai **write-time trigger** (`src/lib/triangulasi.ts`,
 fungsi `checkTriangulasi()`) -- dipanggil langsung tiap ada laporan baru yang
-relevan, bukan cron terjadwal. Dipanggil dari dua tempat:
+relevan, bukan cron terjadwal. Dipanggil dari tiga tempat:
 
 - `POST /api/sekolah/komplain` (sekolah ajukan komplain)
 - `POST /api/orangtua/konfirmasi` (orangtua konfirmasi/lapor masalah)
+- `POST /api/anak/feedback` (anak submit Suara Anak/CVI)
 
-Dua aturan MVP saat ini (disepakati bareng user, detail ambang batas belum
-dirinci di dokumen konsep/teknis -- ini keputusan implementasi):
+Empat aturan saat ini (disepakati bareng user secara bertahap, detail
+ambang batas belum dirinci di dokumen konsep/teknis -- ini keputusan
+implementasi):
 
 1. **Komplain sekolah** -- begitu sekolah menandai distribusi `bermasalah`
    (lewat form komplain), langsung dibikin flag jenis "Komplain kualitas
    dari sekolah".
-2. **Selisih laporan orangtua** -- kalau >=20% dari orangtua yang SUDAH
-   konfirmasi (bukan dari total siswa terdaftar) bilang "tidak
-   diterima"/"ada masalah" utk 1 distribusi yang sama, dibikin flag jenis
-   "Selisih laporan penerimaan". Syarat minimal 3 konfirmasi dulu sebelum
-   aturan ini dicek, supaya 1 laporan tunggal (1/1 = 100%) belum langsung
-   nge-flag saat data masih sangat sedikit.
+2. **Selisih laporan penerimaan/porsi** -- gabungan sinyal dari Orangtua
+   ("tidak_diterima"/"ada_masalah") DAN anak/CVI ("gak habis"), dihitung
+   dalam 1 rasio yang sama karena keduanya indikasi porsi/kualitas
+   bermasalah. Kalau >=20% dari total laporan (orangtua + anak) yang masuk
+   utk 1 distribusi nunjukkin masalah, dibikin flag jenis "Selisih laporan
+   penerimaan". Syarat minimal 3 laporan gabungan dulu sebelum aturan ini
+   dicek, supaya 1 laporan tunggal belum langsung nge-flag saat data masih
+   sangat sedikit. **"Suka/gak suka" dari CVI SENGAJA gak ikut dihitung** --
+   itu soal selera, bukan sinyal ketidaksesuaian data (disepakati bareng
+   user).
+3. **Catatan perbaikan dari anak (CVI)** -- begitu ada 1 anak nulis catatan
+   teks bebas, langsung dibikin flag jenis "Catatan dari anak (CVI)" (sama
+   kayak komplain sekolah, gak nunggu jumlah tertentu). Detail flag berisi
+   SEMUA catatan yang masuk utk distribusi itu (diregenerasi ulang tiap job
+   jalan), tanpa nama/NIS-NISN anak -- konsisten sama aturan anonimisasi CVI
+   ke role Dinas.
+4. **Entri CVI yang lokasinya belum terverifikasi** (`lokasiTerverifikasi:
+   false` -- GPS ditolak/lemah/di luar radius 10m) **tetap dihitung** ke
+   aturan 2 & 3 di atas (disepakati bareng user) -- gagal verifikasi bukan
+   berarti palsu, cuma perlu ditinjau manual (Bagian 3.3 Dok Teknis), bukan
+   alasan exclude otomatis.
 
 Flag yang statusnya masih "terbuka" akan diperbarui detailnya kalau job
 jalan lagi (mis. jumlah laporan bertambah), tapi flag yang udah
@@ -221,11 +240,10 @@ Keputusan yang udah DISEPAKATI bareng user (beda dari draf awal dokumen):
   buat ditinjau manual -- bukan ditolak otomatis, sesuai Bagian 3.3 Dok
   Teknis.
 
-**Belum dikerjakan/known gap:** feedback CVI belum diikutsertakan ke job
-`checkTriangulasi()` sebagai sumber tambahan (Bagian 6.2 nyebut ini
-seharusnya jadi sumber triangulasi juga) -- saat ini cuma tampil terpisah di
-dashboard Dinas, belum otomatis mempengaruhi flag. Perlu keputusan lanjutan
-soal cara agregasinya (per sekolah/per menu?) sebelum diintegrasikan.
+Feedback CVI sekarang JUGA jadi sumber `checkTriangulasi()` (sesuai Bagian
+6.2 -- "data ini menjadi sumber triangulasi tambahan"), bukan cuma tampil
+terpisah lagi -- lihat aturan 2-4 di bagian "Job triangulasi" di atas buat
+detail lengkapnya.
 
 ### Rating (Bagian 6.4)
 
@@ -264,13 +282,11 @@ ujicoba internal.
 
 - Proteksi role per halaman sudah ada (`requireRole()`), tapi belum ada
   halaman "tidak diizinkan" yang jelas -- sekarang cuma redirect diam-diam.
-- Ambang batas & aturan job triangulasi masih judgment call MVP -- perlu
-  dievaluasi ulang bareng Prof Elly/tim Dinas begitu ujicoba internal jalan
-  (mis. apa 20%/minimal 3 konfirmasi udah pas, atau perlu jenis flag
-  tambahan seperti "foto bukti gak sesuai jadwal" yang ada di wireframe
-  awal tapi belum diimplementasi).
-- Feedback Suara Anak (CVI) belum masuk ke job triangulasi otomatis (lihat
-  catatan di bagian Fase 2 di atas).
+- Ambang batas & aturan job triangulasi (termasuk yang gabungan
+  orangtua+anak) masih judgment call MVP -- perlu dievaluasi ulang bareng
+  Prof Elly/tim Dinas begitu ujicoba internal jalan (mis. apa 20%/minimal 3
+  laporan udah pas, atau perlu jenis flag tambahan seperti "foto bukti gak
+  sesuai jadwal" yang ada di wireframe awal tapi belum diimplementasi).
 - Fitur Fase 2 dibangun tanpa wireframe (keputusan sadar demi kecepatan,
   lihat catatan di bagian atas) -- UI-nya fungsional tapi seadanya,
   kemungkinan perlu dirapikan pas QA menyeluruh sebelum ujicoba internal.
