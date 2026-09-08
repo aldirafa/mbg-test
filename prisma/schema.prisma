@@ -1,7 +1,8 @@
 // Skema Prisma - Sistem MBG Digital Triangulasi
-// Cakupan: MVP (Bagian 6.1-6.3 Concept Note + Bagian 5 Dokumen Teknis)
-// Entitas Fase 2 (feedback_anak, rating, pengaduan) sengaja belum dimasukkan
-// -- ditambahkan saat Fase 2 dikerjakan, sesuai roadmap Bagian 11.2.
+// MVP (Bagian 6.1-6.3 Concept Note + Bagian 5 Dokumen Teknis): users, sppg, sekolah,
+// siswa, orangtua, menu_harian, distribusi, konfirmasi_orangtua, flag_triangulasi.
+// Fase 2 (Bagian 11.2 roadmap): feedback_anak, rating, pengaduan -- lihat komentar di
+// tiap model masing-masing utk rujukan bagian dokumen & keputusan implementasi.
 
 generator client {
   provider = "prisma-client-js"
@@ -64,6 +65,8 @@ model Sppg {
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   sekolahList Sekolah[]
   menuHarian  MenuHarian[]
+  ratings     Rating[]
+  pengaduan   Pengaduan[]
 
   @@map("sppg")
 }
@@ -83,6 +86,8 @@ model Sekolah {
   sppg   Sppg      @relation(fields: [sppgId], references: [id])
   siswa  Siswa[]
   distribusi Distribusi[]
+  ratings       Rating[]
+  pengaduanList Pengaduan[]
 
   @@map("sekolah")
 }
@@ -96,6 +101,8 @@ model Orangtua {
 
   user  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   siswa Siswa[]
+  ratings       Rating[]
+  pengaduanList Pengaduan[]
 
   @@map("orangtua")
 }
@@ -111,6 +118,7 @@ model Siswa {
   sekolah             Sekolah              @relation(fields: [sekolahId], references: [id])
   orangtua            Orangtua?            @relation(fields: [orangtuaId], references: [id])
   konfirmasiOrangtua  KonfirmasiOrangtua[]
+  feedbackAnak        FeedbackAnak[]
 
   @@map("siswa")
 }
@@ -153,6 +161,8 @@ model Distribusi {
   sekolah            Sekolah              @relation(fields: [sekolahId], references: [id])
   konfirmasiOrangtua KonfirmasiOrangtua[]
   flagTriangulasi    FlagTriangulasi[]
+  feedbackAnak       FeedbackAnak[]
+  pengaduanList      Pengaduan[]
 
   @@map("distribusi")
 }
@@ -184,4 +194,81 @@ model FlagTriangulasi {
   distribusi Distribusi @relation(fields: [distribusiId], references: [id])
 
   @@map("flag_triangulasi")
+}
+
+enum StatusPengaduan {
+  diterima
+  ditindaklanjuti
+  selesai
+}
+
+// Fase 2, Bagian 6.7 Concept Note & Bagian 3.3 Dok Teknis -- kanal suara anak via QR,
+// tanpa login. NIS/NISN dipakai CUMA buat resolve ke siswa & cegah submit dobel per
+// distribusi (bukan buat pencarian bebas) -- lihat unique constraint di bawah. Nama &
+// NIS/NISN siswa di balik satu entri feedback cuma ditampilkan ke role admin di dashboard
+// Dinas (bukan role dinas biasa), sesuai kesepakatan konsep -- lihat README.
+model FeedbackAnak {
+  id                  String   @id @default(cuid())
+  distribusiId        String   @map("distribusi_id")
+  siswaId             String   @map("siswa_id")
+  suka                Boolean
+  habis               Boolean
+  catatanPerbaikan    String?  @map("catatan_perbaikan")
+  geotagLat           Float?   @map("geotag_lat")
+  geotagLng           Float?   @map("geotag_lng")
+  // true = lokasi perangkat konsisten dgn radius 10m dari titik acuan sekolah saat submit.
+  // false (GPS lemah/ditolak/di luar radius) -> tetap disimpan, ditandai buat ditinjau
+  // manual, BUKAN ditolak otomatis (Bagian 3.3 Dok Teknis).
+  lokasiTerverifikasi Boolean  @default(false) @map("lokasi_terverifikasi")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  distribusi Distribusi @relation(fields: [distribusiId], references: [id])
+  siswa      Siswa      @relation(fields: [siswaId], references: [id])
+
+  // Satu anak cuma bisa ngisi sekali per distribusi (hari) -- inti dari "cegah submit dobel".
+  @@unique([distribusiId, siswaId])
+  @@map("feedback_anak")
+}
+
+// Fase 2, Bagian 6.4 -- skor berkala dari sekolah & orangtua ke SPPG. MVP: rater bisa
+// ngirim kapan aja (belum ada pembatasan frekuensi "berkala" secara ketat -- disederhanakan,
+// lihat README), riwayatnya disimpan semua, skor SPPG = rata-rata seluruh riwayat.
+// Rater (persis salah satu): sekolahId ATAU orangtuaId -- dijaga di application layer.
+model Rating {
+  id         String   @id @default(cuid())
+  sppgId     String   @map("sppg_id")
+  sekolahId  String?  @map("sekolah_id")
+  orangtuaId String?  @map("orangtua_id")
+  skor       Int
+  catatan    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  sppg     Sppg      @relation(fields: [sppgId], references: [id])
+  sekolah  Sekolah?  @relation(fields: [sekolahId], references: [id])
+  orangtua Orangtua? @relation(fields: [orangtuaId], references: [id])
+
+  @@map("rating")
+}
+
+// Fase 2, Bagian 6.5 -- beda dari distribusi.catatan (komplain ringkas per-distribusi,
+// MVP). Ini kanal pengaduan trackable penuh: bisa dari sekolah ATAUPUN orangtua, gak
+// harus terikat 1 distribusi tertentu (distribusiId opsional), dan Dinas yang kelola
+// status-nya end-to-end (diterima -> ditindaklanjuti -> selesai).
+model Pengaduan {
+  id           String          @id @default(cuid())
+  sekolahId    String?         @map("sekolah_id")
+  orangtuaId   String?         @map("orangtua_id")
+  sppgId       String?         @map("sppg_id")
+  distribusiId String?         @map("distribusi_id")
+  isi          String
+  fotoUrl      String?         @map("foto_url")
+  status       StatusPengaduan @default(diterima)
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  sekolah    Sekolah?    @relation(fields: [sekolahId], references: [id])
+  orangtua   Orangtua?   @relation(fields: [orangtuaId], references: [id])
+  sppg       Sppg?       @relation(fields: [sppgId], references: [id])
+  distribusi Distribusi? @relation(fields: [distribusiId], references: [id])
+
+  @@map("pengaduan")
 }

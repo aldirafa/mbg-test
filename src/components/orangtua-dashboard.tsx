@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { RatingWidget } from "@/components/rating-widget";
+import { PengaduanPanel } from "@/components/pengaduan-panel";
 
 type ChildData = {
   siswa: { id: string; nama: string; kelas: string | null };
@@ -9,7 +11,7 @@ type ChildData = {
   distribusi: {
     id: string;
     status: string;
-    menu: { tanggal: string; deskripsi: string };
+    menu: { tanggal: string; deskripsi: string; sppg: { id: string; namaSppg: string } };
   } | null;
   konfirmasi: { statusTerima: string; catatan: string | null } | null;
 };
@@ -143,6 +145,16 @@ export function OrangtuaDashboard() {
                 </div>
               )}
 
+              {child.distribusi && !menungguSekolah && (
+                <div className="p-4 border-t border-neutral-200">
+                  <RatingWidget
+                    endpoint="/api/orangtua/rating"
+                    extraBody={{ sppgId: child.distribusi.menu.sppg.id }}
+                    label={`Kasih rating buat ${child.distribusi.menu.sppg.namaSppg}`}
+                  />
+                </div>
+              )}
+
               {child.konfirmasi && (
                 <div className="p-4 border-t border-neutral-200">
                   {child.konfirmasi.statusTerima === "diterima" ? (
@@ -160,6 +172,22 @@ export function OrangtuaDashboard() {
           );
         })}
       </div>
+
+      {children.some((c) => c.distribusi) && (
+        <PengaduanPanel
+          endpoint="/api/orangtua/pengaduan"
+          title="Pengaduan ke SPPG"
+          extraBody={(() => {
+            const withDistribusi = children.find((c) => c.distribusi);
+            return withDistribusi
+              ? {
+                  sppgId: withDistribusi.distribusi!.menu.sppg.id,
+                  distribusiId: withDistribusi.distribusi!.id,
+                }
+              : {};
+          })()}
+        />
+      )}
     </main>
   );
 }

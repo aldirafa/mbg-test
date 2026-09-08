@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { PengaduanPanel } from "@/components/pengaduan-panel";
 
 type Distribusi = {
   id: string;
@@ -28,6 +29,7 @@ type EditState = { deskripsi: string; jumlahPorsi: string; foto: File | null };
 
 export function SppgDashboard() {
   const [menuList, setMenuList] = useState<Menu[]>([]);
+  const [rating, setRating] = useState<{ rataRata: number | null; jumlah: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [deskripsi, setDeskripsi] = useState("");
   const [jumlahPorsi, setJumlahPorsi] = useState("");
@@ -46,6 +48,9 @@ export function SppgDashboard() {
       .then((r) => r.json())
       .then((d) => setMenuList(d.menu ?? []))
       .finally(() => setLoading(false));
+    fetch("/api/sppg/rating")
+      .then((r) => r.json())
+      .then((d) => setRating({ rataRata: d.rataRata ?? null, jumlah: d.jumlah ?? 0 }));
   }, []);
 
   async function handleSubmit(e: FormEvent) {
@@ -122,6 +127,15 @@ export function SppgDashboard() {
   return (
     <DashboardShell title="Portal SPPG" subtitle="Unggah menu harian & distribusi ke sekolah">
       <main className="max-w-lg mx-auto p-6 space-y-8">
+        {rating && rating.jumlah > 0 && (
+          <div className="border border-neutral-200 rounded-lg p-4 text-sm flex items-center justify-between">
+            <span className="text-neutral-600">Rating dari Sekolah &amp; Orangtua</span>
+            <span className="font-semibold">
+              ⭐ {rating.rataRata?.toFixed(1)}{" "}
+              <span className="text-neutral-400 font-normal">({rating.jumlah})</span>
+            </span>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4 border border-neutral-200 rounded-lg p-5">
           <h2 className="font-medium text-sm">Unggah Menu Hari Ini</h2>
 
@@ -295,6 +309,13 @@ export function SppgDashboard() {
             })}
           </div>
         </div>
+
+        <PengaduanPanel
+          endpoint="/api/sppg/pengaduan"
+          title="Pengaduan Masuk"
+          readOnly
+          showSubmitter
+        />
       </main>
     </DashboardShell>
   );

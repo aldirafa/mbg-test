@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { SekolahLokasiManager } from "@/components/sekolah-lokasi-manager";
+import { PengaduanManager } from "@/components/pengaduan-manager";
+import { FeedbackAnakViewer } from "@/components/feedback-anak-viewer";
 
 type Flag = {
   id: string;
@@ -198,6 +201,10 @@ export function DinasDashboard() {
             )}
           </div>
         </div>
+
+        <SekolahLokasiManager />
+        <PengaduanManager />
+        <FeedbackAnakViewer />
       </main>
     </DashboardShell>
   );

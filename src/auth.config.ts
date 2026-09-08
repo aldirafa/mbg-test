@@ -15,7 +15,13 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const isPublicRoute =
         nextUrl.pathname === "/login" ||
-        nextUrl.pathname.startsWith("/api/auth");
+        nextUrl.pathname.startsWith("/api/auth") ||
+        // Child Voice Interface (Fase 2) -- publik, tanpa login, diakses lewat QR.
+        nextUrl.pathname.startsWith("/suara-anak") ||
+        nextUrl.pathname.startsWith("/api/anak") ||
+        // Dashboard transparansi publik (Fase 2, Bagian 6.6) -- publik, agregat saja.
+        nextUrl.pathname.startsWith("/transparansi") ||
+        nextUrl.pathname.startsWith("/api/publik");
 
       if (isPublicRoute) return true;
       return isLoggedIn;

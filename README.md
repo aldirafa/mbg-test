@@ -1,12 +1,22 @@
 # MBG Digital - Model Triangulasi
 
 Purwarupa sistem pengelolaan MBG Digital dengan model triangulasi
-SPPG - Sekolah - Orangtua, untuk pilot di SMAN 1 Garut.
+SPPG - Sekolah - Orangtua.
+
+**Update timeline (per kesepakatan terbaru):** target sekarang adalah
+**ujicoba internal**, bukan lagi pilot langsung ke SMAN 1 Garut -- itu
+digeser ke 2027. Karena gak ada lagi tenggat pilot eksternal tahun ini,
+seluruh fitur MVP + Fase 2 dikerjakan sekaligus dulu, baru QA menyeluruh
+sekali di akhir sebelum ujicoba internal (bukan QA bertahap per modul
+kayak sebelumnya).
 
 Dokumen konsep & teknis lengkap ada di project Claude "MBG Digital Prof Elly"
 (Konsep-Sistem-MBG-Digital-Triangulasi.docx & Dokumen-Teknis-MBG-Digital.docx).
-Wireframe/prototype UX per peran (sudah di-approve Prof Elly): lihat artifact
-"Wireframe MBG Digital".
+Wireframe/prototype UX per peran MVP (sudah di-approve Prof Elly): lihat
+artifact "Wireframe MBG Digital". Fitur Fase 2 (Suara Anak/CVI, Rating,
+Pengaduan, Dashboard Publik) dikerjakan langsung dari dokumen + kesepakatan
+chat, TANPA wireframe terpisah -- keputusan sadar buat ngejar kecepatan,
+jadi UI-nya seadanya/fungsional dan wajar kalau perlu dirapikan pas QA.
 
 ## Stack
 
@@ -31,6 +41,10 @@ cp .env.example .env
 npx prisma generate
 npx prisma db push   # sinkronkan skema ke database (dev awal, sebelum pakai migrate)
 npm run db:seed      # bikin akun awal per role, lihat output terminal buat kredensialnya
+
+# Kalau kamu lagi update dari clone/pull sebelumnya dan schema.prisma berubah
+# (mis. abis nambah entitas Fase 2), jalanin ulang 2 baris di atas
+# (generate + db push) biar Prisma Client & database-nya sinkron.
 
 npm run dev
 ```
@@ -66,41 +80,51 @@ Terminal biasa, bukan lewat bridge.
 src/
   app/
     login/         # form login (semua peran)
-    sppg/          # portal SPPG - unggah menu & distribusi
-    sekolah/       # portal Sekolah - konfirmasi & pesan siap-bagi
-    orangtua/      # dashboard Orangtua - konfirmasi anak menerima makan
-    dinas/         # dashboard Dinas/Admin - lihat & tindak lanjuti flag triangulasi
+    sppg/          # portal SPPG - unggah menu, distribusi, lihat rating & pengaduan masuk
+    sekolah/       # portal Sekolah - konfirmasi, rating, pengaduan, titik lokasi geo-fence
+    orangtua/      # dashboard Orangtua - konfirmasi anak, rating, pengaduan
+    dinas/         # dashboard Dinas/Admin - flag triangulasi, lokasi sekolah, pengaduan,
+                   # feedback Suara Anak (CVI)
+    suara-anak/    # PUBLIK, tanpa login - form Child Voice Interface (Fase 2, QR)
+    transparansi/  # PUBLIK, tanpa login - dashboard transparansi agregat (Fase 2)
     api/
       auth/[...nextauth]/   # route handler Auth.js
-      sppg/menu, sppg/distribusi
-      sekolah/distribusi, sekolah/konfirmasi, sekolah/komplain, sekolah/pesan-harian
-      orangtua/menu-hari-ini, orangtua/konfirmasi
-      dinas/flags, dinas/flags/[id]
-  components/      # client component per dashboard peran + session provider
+      sppg/menu, sppg/distribusi, sppg/rating, sppg/pengaduan
+      sekolah/distribusi, sekolah/konfirmasi, sekolah/komplain, sekolah/pesan-harian,
+      sekolah/lokasi, sekolah/rating, sekolah/pengaduan
+      orangtua/menu-hari-ini, orangtua/konfirmasi, orangtua/rating, orangtua/pengaduan
+      dinas/flags, dinas/flags/[id], dinas/sekolah, dinas/sekolah/[id]/lokasi,
+      dinas/pengaduan, dinas/pengaduan/[id], dinas/feedback-anak
+      anak/feedback   # PUBLIK -- submit Child Voice Interface
+      publik/stats    # PUBLIK -- angka agregat dashboard transparansi
+  components/      # client component per dashboard peran + widget lintas-peran
+                   # (RatingWidget, PengaduanPanel, dll) + session provider
   auth.ts          # config Auth.js lengkap (Credentials provider + Prisma)
-  auth.config.ts   # config edge-safe dipakai proxy.ts (tanpa Prisma)
+  auth.config.ts   # config edge-safe dipakai proxy.ts (tanpa Prisma) -- termasuk
+                   # daftar route publik (suara-anak, transparansi, & API publiknya)
   proxy.ts         # proteksi route (Next.js 16 -- pengganti middleware.ts): redirect ke /login
   lib/
     prisma.ts        # Prisma Client singleton
     storage.ts        # upload foto ke Supabase Storage
     auth-helpers.ts    # requireRole() -- guard role per halaman server component
     triangulasi.ts     # job pembanding 3 laporan -- lihat "Job triangulasi" di bawah
+    geo.ts             # haversine + radius geo-fence -- dipakai Child Voice Interface
   types/next-auth.d.ts  # augmentasi tipe role & id di Session/JWT
 prisma/
-  schema.prisma    # skema DB cakupan MVP (Bagian 5 Dokumen Teknis)
+  schema.prisma    # skema DB -- MVP (Bagian 5 Dokumen Teknis) + Fase 2 (Bagian 11.2)
   seed.ts          # data awal: 1 SPPG, 1 Sekolah, 1 Orangtua+Siswa, 1 Dinas
 ```
 
-Skema Prisma saat ini mencakup entitas MVP saja (users, sppg, sekolah,
-siswa, orangtua, menu_harian, distribusi, konfirmasi_orangtua,
-flag_triangulasi). Entitas Fase 2 (feedback_anak, rating, pengaduan)
-sengaja belum ditambahkan — menyusul sesuai roadmap Bagian 11.2 Dokumen
-Teknis, setelah pilot MVP berjalan.
+Skema Prisma sekarang mencakup MVP (users, sppg, sekolah, siswa, orangtua,
+menu_harian, distribusi, konfirmasi_orangtua, flag_triangulasi) DAN Fase 2
+(feedback_anak, rating, pengaduan) -- lihat komentar di tiap model di
+`schema.prisma` buat rujukan bagian dokumen & keputusan implementasi
+masing-masing.
 
 Field `distribusi.catatan` dipakai buat komplain ringkas sekolah -> SPPG per
 distribusi (status `bermasalah`). Ini beda dari entitas `pengaduan` (Fase 2)
 yang jadi sistem pengaduan trackable penuh (Bagian 6.5) dengan status
-diterima/ditindaklanjuti/selesai dan bisa dari orangtua juga.
+diterima/ditindaklanjuti/selesai dan bisa dari sekolah maupun orangtua.
 
 ## Alur yang sudah bisa dites end-to-end
 
@@ -119,6 +143,19 @@ diterima/ditindaklanjuti/selesai dan bisa dari orangtua juga.
    triangulasi" di bawah buat aturan lengkapnya).
 
 Password semua akun seed sama, dicetak di terminal setelah `npm run db:seed`.
+
+Fitur Fase 2 yang bisa langsung dites juga:
+
+5. Buka `/suara-anak` (gak perlu login) -> masukin NIS/NISN siswa seed
+   (`1234567890`, Bilqis) -> isi feedback emoji -> kirim. Coba isi 2x buat
+   lihat pesan "udah ngisi hari ini".
+6. Buka `/transparansi` (gak perlu login) -> lihat angka agregat.
+7. Di dashboard Sekolah/Orangtua, coba widget "Kasih rating" & panel
+   "Pengaduan" -> cek hasilnya muncul di dashboard SPPG (rating: agregat aja;
+   pengaduan: baca-saja) dan di dashboard Dinas (panel "Kelola Pengaduan").
+8. Di dashboard Sekolah, set "Titik Lokasi Sekolah" dulu (perlu izin lokasi
+   browser) sebelum coba `/suara-anak` dari device yang sama, biar
+   `lokasiTerverifikasi` bisa kebaca `true` (radius 10m).
 
 ## Job triangulasi (Fase 5)
 
@@ -155,15 +192,89 @@ Dashboard Dinas (`/dinas`) menampilkan semua flag, bisa difilter per status,
 dan Dinas bisa majuin status flag terbuka -> ditindaklanjuti -> selesai
 (linear, belum ada tombol mundur di MVP ini).
 
+## Fase 2
+
+Semua item Fase 2 (Bagian 11.2 roadmap) udah dibangun. Detail per fitur:
+
+### Child Voice Interface / Suara Anak (Bagian 6.7, 3.3)
+
+Form publik di `/suara-anak` -- tanpa login, dimaksudkan diakses lewat QR yang
+ditempel di area makan siswa (QR-nya sendiri belum dibikin/dicetak, itu
+kerjaan operasional, bukan bagian dari app ini). Alurnya: anak masukin
+NIS/NISN, jawab 2 pertanyaan emoji (suka/gak suka, habis/gak habis), opsional
+catatan perbaikan, kirim.
+
+Keputusan yang udah DISEPAKATI bareng user (beda dari draf awal dokumen):
+- **Consent** data anak diurus terpisah di level deployment/operasional --
+  di luar scope frontend/backend aplikasi ini.
+- **NIS/NISN** cuma dipakai server-side buat (1) cari siswa yang sesuai dan
+  (2) cegah 1 anak ngisi 2x per hari (`@@unique([distribusiId, siswaId])` di
+  `FeedbackAnak`). Identitas siswa (nama & NIS/NISN) di balik tiap entri
+  feedback CUMA ditampilkan ke role **admin** di dashboard Dinas -- role
+  **dinas** biasa lihat entrinya teranonimkan (lihat
+  `src/app/api/dinas/feedback-anak/route.ts`).
+- **Radius geo-fence: 10 meter** (bukan ±100-150m di draf dokumen awal), dari
+  titik acuan yang di-set sekolah sendiri (kartu "Titik Lokasi Sekolah" di
+  dashboard Sekolah) dan/atau dikoreksi Dinas/Admin (panel "Kelola Titik
+  Lokasi Sekolah" di dashboard Dinas). Kalau lokasi gak match/GPS
+  ditolak/lemah, submission TETAP disimpan (`lokasiTerverifikasi: false`)
+  buat ditinjau manual -- bukan ditolak otomatis, sesuai Bagian 3.3 Dok
+  Teknis.
+
+**Belum dikerjakan/known gap:** feedback CVI belum diikutsertakan ke job
+`checkTriangulasi()` sebagai sumber tambahan (Bagian 6.2 nyebut ini
+seharusnya jadi sumber triangulasi juga) -- saat ini cuma tampil terpisah di
+dashboard Dinas, belum otomatis mempengaruhi flag. Perlu keputusan lanjutan
+soal cara agregasinya (per sekolah/per menu?) sebelum diintegrasikan.
+
+### Rating (Bagian 6.4)
+
+Sekolah & Orangtua bisa ngasih skor 1-5 + catatan opsional ke SPPG mereka
+kapan aja (widget `RatingWidget` di dashboard masing-masing). SPPG cuma
+lihat HASIL agregat (rata-rata & jumlah) di dashboard-nya sendiri, gak lihat
+siapa yang ngasih rating apa -- jaga anonimitas rater sesuai matriks peran
+Bagian 4.
+
+**Penyederhanaan MVP (judgment call, belum dirinci di dokumen):** dokumen
+bilang rating "berkala" tapi gak nentuin intervalnya -- di sini rater bisa
+ngirim kapan aja tanpa pembatasan frekuensi (mis. sekali per minggu). Kalau
+mau lebih ketat, perlu ditambah validasi tanggal terakhir submit per rater.
+
+### Pengaduan (Bagian 6.5)
+
+Kanal pengaduan trackable penuh (`diterima -> ditindaklanjuti -> selesai`),
+beda dari `distribusi.catatan` (komplain ringkas 1-distribusi, MVP). Sekolah
+& Orangtua bisa ajukan (opsional terkait 1 distribusi tertentu), SPPG baca
+yang terkait dirinya, Dinas kelola status semua pengaduan (panel "Kelola
+Pengaduan" di dashboard Dinas).
+
+### Dashboard Publik / Transparansi (Bagian 6.6)
+
+Halaman publik di `/transparansi` -- tanpa login, cuma angka agregat (jumlah
+SPPG aktif, jumlah sekolah, % konsistensi pelaporan sekolah, % partisipasi
+orangtua, rata-rata rating). TIDAK ADA data individual/PII.
+
+**Penyederhanaan MVP:** "partisipasi orangtua" dihitung sebagai proporsi
+siswa terdaftar yang orangtuanya PERNAH ngirim minimal 1 konfirmasi
+(bukan per-hari) -- metrik yang lebih presisi (mis. partisipasi harian/
+mingguan) bisa disusun kalau dibutuhkan setelah lihat data riil dari
+ujicoba internal.
+
 ## Belum dikerjakan (langkah berikutnya)
 
 - Proteksi role per halaman sudah ada (`requireRole()`), tapi belum ada
   halaman "tidak diizinkan" yang jelas -- sekarang cuma redirect diam-diam.
-- Ambang batas & aturan job triangulasi di atas masih judgment call MVP --
-  perlu dievaluasi ulang bareng Prof Elly/tim Dinas begitu pilot jalan
+- Ambang batas & aturan job triangulasi masih judgment call MVP -- perlu
+  dievaluasi ulang bareng Prof Elly/tim Dinas begitu ujicoba internal jalan
   (mis. apa 20%/minimal 3 konfirmasi udah pas, atau perlu jenis flag
   tambahan seperti "foto bukti gak sesuai jadwal" yang ada di wireframe
   awal tapi belum diimplementasi).
-- Fase 2 (Bagian 11.2): rating SPPG, kanal pengaduan trackable, dashboard
-  transparansi publik, Child Voice Interface -- menyusul setelah pilot MVP
-  jalan.
+- Feedback Suara Anak (CVI) belum masuk ke job triangulasi otomatis (lihat
+  catatan di bagian Fase 2 di atas).
+- Fitur Fase 2 dibangun tanpa wireframe (keputusan sadar demi kecepatan,
+  lihat catatan di bagian atas) -- UI-nya fungsional tapi seadanya,
+  kemungkinan perlu dirapikan pas QA menyeluruh sebelum ujicoba internal.
+- QA menyeluruh (Fase 6 roadmap: unit/E2E testing, review UX Fase 2, cek
+  keamanan endpoint publik `/api/anak/feedback` & `/api/publik/stats`
+  terhadap abuse/rate-limit) -- belum dikerjakan, ini langkah berikutnya
+  yang disepakati (Fase 2 dulu, QA sekali di akhir).

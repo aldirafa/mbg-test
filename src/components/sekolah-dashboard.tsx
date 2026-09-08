@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { LokasiSekolahCard } from "@/components/lokasi-sekolah-card";
+import { RatingWidget } from "@/components/rating-widget";
+import { PengaduanPanel } from "@/components/pengaduan-panel";
 
 type Distribusi = {
   id: string;
@@ -100,6 +103,11 @@ export function SekolahDashboard() {
   return (
     <DashboardShell title="Portal Sekolah" subtitle="Konfirmasi distribusi & bagikan info ke orangtua">
       <main className="max-w-lg mx-auto p-6 space-y-4">
+        <LokasiSekolahCard />
+        <div className="border border-neutral-200 rounded-lg p-4">
+          <RatingWidget endpoint="/api/sekolah/rating" label="Kasih rating buat SPPG" />
+        </div>
+        <PengaduanPanel endpoint="/api/sekolah/pengaduan" title="Pengaduan ke SPPG" />
         {loading && <p className="text-sm text-neutral-500">Memuat...</p>}
         {!loading && list.length === 0 && (
           <p className="text-sm text-neutral-500">Belum ada distribusi masuk.</p>

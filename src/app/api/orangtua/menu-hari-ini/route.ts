@@ -21,7 +21,7 @@ export async function GET() {
       const distribusi = await prisma.distribusi.findFirst({
         where: { sekolahId: siswa.sekolahId },
         orderBy: { waktuKirim: "desc" },
-        include: { menu: true },
+        include: { menu: { include: { sppg: true } } },
       });
 
       const konfirmasi = distribusi
