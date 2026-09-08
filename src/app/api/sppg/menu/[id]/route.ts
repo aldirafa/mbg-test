@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadPhoto } from "@/lib/storage";
+import { parseGizi } from "@/lib/gizi";
 
 async function getOwnedMenu(sppgId: string, id: string) {
   return prisma.menuHarian.findFirst({
@@ -37,9 +38,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const deskripsi = String(formData.get("deskripsi") || "").trim();
   const jumlahPorsi = Number(formData.get("jumlahPorsi"));
   const foto = formData.get("foto");
+  const gizi = parseGizi(formData);
 
   if (!deskripsi || !Number.isFinite(jumlahPorsi) || jumlahPorsi <= 0) {
     return NextResponse.json({ error: "Deskripsi & jumlah porsi wajib diisi dengan benar" }, { status: 400 });
+  }
+  if (!gizi) {
+    return NextResponse.json(
+      { error: "Nomor menu, siklus, & semua nilai gizi (Kategori I & II) wajib diisi dengan angka valid" },
+      { status: 400 }
+    );
   }
 
   let fotoUrl = menu.fotoUrl;
@@ -56,7 +64,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const updated = await prisma.menuHarian.update({
     where: { id: menu.id },
-    data: { deskripsi, jumlahPorsi, fotoUrl },
+    data: { deskripsi, jumlahPorsi, fotoUrl, ...gizi },
     include: { distribusi: { include: { sekolah: true } } },
   });
 

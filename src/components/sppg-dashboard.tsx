@@ -16,6 +16,16 @@ type Menu = {
   deskripsi: string;
   fotoUrl: string | null;
   jumlahPorsi: number;
+  nomorMenu: number | null;
+  siklus: number | null;
+  energiKategoriI: number | null;
+  proteinKategoriI: number | null;
+  lemakKategoriI: number | null;
+  karbohidratKategoriI: number | null;
+  energiKategoriII: number | null;
+  proteinKategoriII: number | null;
+  lemakKategoriII: number | null;
+  karbohidratKategoriII: number | null;
   distribusi: Distribusi[];
 };
 
@@ -25,7 +35,135 @@ const STATUS_LABEL: Record<string, string> = {
   bermasalah: "Bermasalah",
 };
 
-type EditState = { deskripsi: string; jumlahPorsi: string; foto: File | null };
+// Nilai gizi disimpan sbg string di form state (biar input kosong gampang dicek/dikirim),
+// baru di-parse jadi number di server (lihat src/lib/gizi.ts).
+type GiziForm = {
+  nomorMenu: string;
+  siklus: string;
+  energiKategoriI: string;
+  proteinKategoriI: string;
+  lemakKategoriI: string;
+  karbohidratKategoriI: string;
+  energiKategoriII: string;
+  proteinKategoriII: string;
+  lemakKategoriII: string;
+  karbohidratKategoriII: string;
+};
+
+const GIZI_KOSONG: GiziForm = {
+  nomorMenu: "",
+  siklus: "",
+  energiKategoriI: "",
+  proteinKategoriI: "",
+  lemakKategoriI: "",
+  karbohidratKategoriI: "",
+  energiKategoriII: "",
+  proteinKategoriII: "",
+  lemakKategoriII: "",
+  karbohidratKategoriII: "",
+};
+
+function giziFromMenu(menu: Menu): GiziForm {
+  return {
+    nomorMenu: menu.nomorMenu != null ? String(menu.nomorMenu) : "",
+    siklus: menu.siklus != null ? String(menu.siklus) : "",
+    energiKategoriI: menu.energiKategoriI != null ? String(menu.energiKategoriI) : "",
+    proteinKategoriI: menu.proteinKategoriI != null ? String(menu.proteinKategoriI) : "",
+    lemakKategoriI: menu.lemakKategoriI != null ? String(menu.lemakKategoriI) : "",
+    karbohidratKategoriI: menu.karbohidratKategoriI != null ? String(menu.karbohidratKategoriI) : "",
+    energiKategoriII: menu.energiKategoriII != null ? String(menu.energiKategoriII) : "",
+    proteinKategoriII: menu.proteinKategoriII != null ? String(menu.proteinKategoriII) : "",
+    lemakKategoriII: menu.lemakKategoriII != null ? String(menu.lemakKategoriII) : "",
+    karbohidratKategoriII: menu.karbohidratKategoriII != null ? String(menu.karbohidratKategoriII) : "",
+  };
+}
+
+function setGiziOnFormData(formData: FormData, gizi: GiziForm) {
+  (Object.keys(gizi) as (keyof GiziForm)[]).forEach((key) => formData.set(key, gizi[key]));
+}
+
+function GiziFields({
+  value,
+  onChange,
+}: {
+  value: GiziForm;
+  onChange: (next: GiziForm) => void;
+}) {
+  function field(key: keyof GiziForm) {
+    return (
+      <input
+        required
+        type="number"
+        step="any"
+        min={0}
+        value={value[key]}
+        onChange={(e) => onChange({ ...value, [key]: e.target.value })}
+        className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3 border border-neutral-200 rounded-md p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-neutral-600">Nomor menu</label>
+          {field("nomorMenu")}
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-neutral-600">Siklus</label>
+          {field("siklus")}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-neutral-600">Nilai Gizi – Kategori I (SD)</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Energi (kkal)</label>
+            {field("energiKategoriI")}
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Protein (g)</label>
+            {field("proteinKategoriI")}
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Lemak (g)</label>
+            {field("lemakKategoriI")}
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Karbohidrat (g)</label>
+            {field("karbohidratKategoriI")}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-neutral-600">Nilai Gizi – Kategori II (SMP ke atas)</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Energi (kkal)</label>
+            {field("energiKategoriII")}
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Protein (g)</label>
+            {field("proteinKategoriII")}
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Lemak (g)</label>
+            {field("lemakKategoriII")}
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Karbohidrat (g)</label>
+            {field("karbohidratKategoriII")}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type EditState = { deskripsi: string; jumlahPorsi: string; foto: File | null; gizi: GiziForm };
 
 export function SppgDashboard() {
   const [menuList, setMenuList] = useState<Menu[]>([]);
@@ -34,11 +172,17 @@ export function SppgDashboard() {
   const [deskripsi, setDeskripsi] = useState("");
   const [jumlahPorsi, setJumlahPorsi] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
+  const [gizi, setGizi] = useState<GiziForm>(GIZI_KOSONG);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>({ deskripsi: "", jumlahPorsi: "", foto: null });
+  const [editState, setEditState] = useState<EditState>({
+    deskripsi: "",
+    jumlahPorsi: "",
+    foto: null,
+    gizi: GIZI_KOSONG,
+  });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
@@ -62,6 +206,7 @@ export function SppgDashboard() {
     formData.set("deskripsi", deskripsi);
     formData.set("jumlahPorsi", jumlahPorsi);
     if (foto) formData.set("foto", foto);
+    setGiziOnFormData(formData, gizi);
 
     const res = await fetch("/api/sppg/menu", { method: "POST", body: formData });
     const data = await res.json();
@@ -76,12 +221,18 @@ export function SppgDashboard() {
     setDeskripsi("");
     setJumlahPorsi("");
     setFoto(null);
+    setGizi(GIZI_KOSONG);
     setSubmitting(false);
   }
 
   function startEdit(menu: Menu) {
     setEditingId(menu.id);
-    setEditState({ deskripsi: menu.deskripsi, jumlahPorsi: String(menu.jumlahPorsi), foto: null });
+    setEditState({
+      deskripsi: menu.deskripsi,
+      jumlahPorsi: String(menu.jumlahPorsi),
+      foto: null,
+      gizi: giziFromMenu(menu),
+    });
     setRowError(null);
   }
 
@@ -92,6 +243,7 @@ export function SppgDashboard() {
     formData.set("deskripsi", editState.deskripsi);
     formData.set("jumlahPorsi", editState.jumlahPorsi);
     if (editState.foto) formData.set("foto", editState.foto);
+    setGiziOnFormData(formData, editState.gizi);
 
     const res = await fetch(`/api/sppg/menu/${menuId}`, { method: "PATCH", body: formData });
     const data = await res.json();
@@ -164,6 +316,14 @@ export function SppgDashboard() {
           </div>
 
           <div className="space-y-1">
+            <label className="text-sm font-medium">Nomor menu, siklus & nilai gizi</label>
+            <p className="text-xs text-neutral-500">
+              Wajib diisi -- ikut ditampilkan di pesan WA ke sekolah (permintaan tim Prof Elly).
+            </p>
+            <GiziFields value={gizi} onChange={setGizi} />
+          </div>
+
+          <div className="space-y-1">
             <label className="text-sm font-medium">Foto masakan (opsional)</label>
             <input
               type="file"
@@ -210,6 +370,11 @@ export function SppgDashboard() {
                         </span>
                         <span className="text-neutral-500">{menu.jumlahPorsi} porsi</span>
                       </div>
+                      {menu.nomorMenu != null && menu.siklus != null && (
+                        <p className="text-xs text-neutral-500 mt-0.5">
+                          Menu {menu.nomorMenu} Siklus {menu.siklus}
+                        </p>
+                      )}
                       <p className="text-neutral-600 mt-1">{menu.deskripsi}</p>
                       <div className="flex flex-wrap gap-2 mt-2">
                         {menu.distribusi.map((d) => (
@@ -276,6 +441,10 @@ export function SppgDashboard() {
                         value={editState.jumlahPorsi}
                         onChange={(e) => setEditState((s) => ({ ...s, jumlahPorsi: e.target.value }))}
                         className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                      />
+                      <GiziFields
+                        value={editState.gizi}
+                        onChange={(next) => setEditState((s) => ({ ...s, gizi: next }))}
                       />
                       <div className="space-y-1">
                         <label className="text-xs text-neutral-500">Ganti foto (opsional)</label>

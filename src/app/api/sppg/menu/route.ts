@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadPhoto } from "@/lib/storage";
+import { parseGizi } from "@/lib/gizi";
 
 export async function GET() {
   const session = await auth();
@@ -42,9 +43,16 @@ export async function POST(req: Request) {
   const deskripsi = String(formData.get("deskripsi") || "").trim();
   const jumlahPorsi = Number(formData.get("jumlahPorsi"));
   const foto = formData.get("foto");
+  const gizi = parseGizi(formData);
 
   if (!deskripsi || !Number.isFinite(jumlahPorsi) || jumlahPorsi <= 0) {
     return NextResponse.json({ error: "Deskripsi & jumlah porsi wajib diisi dengan benar" }, { status: 400 });
+  }
+  if (!gizi) {
+    return NextResponse.json(
+      { error: "Nomor menu, siklus, & semua nilai gizi (Kategori I & II) wajib diisi dengan angka valid" },
+      { status: 400 }
+    );
   }
 
   let fotoUrl: string | undefined;
@@ -67,6 +75,7 @@ export async function POST(req: Request) {
       deskripsi,
       fotoUrl,
       jumlahPorsi,
+      ...gizi,
     },
   });
 

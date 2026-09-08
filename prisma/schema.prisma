@@ -134,6 +134,23 @@ model MenuHarian {
   geotagKirimLng Float?  @map("geotag_kirim_lng")
   jumlahPorsi   Int      @map("jumlah_porsi")
 
+  // Nomor menu & siklus (mis. "Menu 8 Siklus 2") + nilai gizi per kategori usia, diminta
+  // tim Prof Elly (Teh Lingga) supaya ikut ditampilkan di pesan siap-bagi ke sekolah.
+  // WAJIB diisi di form upload SPPG (lihat zod schema di API route) -- tapi kolomnya
+  // dibiarkan nullable di level DB, biar data menu lama (sebelum field ini ada) gak
+  // rusak/perlu di-backfill paksa.
+  nomorMenu     Int?     @map("nomor_menu")
+  siklus        Int?
+  // Kategori I = anak SD, Kategori II = SMP ke atas (Bagian 8 Dok Teknis/kesepakatan chat).
+  energiKategoriI       Float? @map("energi_kategori_1")
+  proteinKategoriI      Float? @map("protein_kategori_1")
+  lemakKategoriI        Float? @map("lemak_kategori_1")
+  karbohidratKategoriI  Float? @map("karbohidrat_kategori_1")
+  energiKategoriII      Float? @map("energi_kategori_2")
+  proteinKategoriII     Float? @map("protein_kategori_2")
+  lemakKategoriII       Float? @map("lemak_kategori_2")
+  karbohidratKategoriII Float? @map("karbohidrat_kategori_2")
+
   sppg        Sppg         @relation(fields: [sppgId], references: [id])
   distribusi  Distribusi[]
 

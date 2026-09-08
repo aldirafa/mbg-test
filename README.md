@@ -278,6 +278,34 @@ siswa terdaftar yang orangtuanya PERNAH ngirim minimal 1 konfirmasi
 mingguan) bisa disusun kalau dibutuhkan setelah lihat data riil dari
 ujicoba internal.
 
+### Info gizi & nomor menu di pesan WA ke sekolah (feedback Teh Lingga, tim Prof Elly)
+
+Pesan "siap-bagi" yang di-generate di dashboard Sekolah (tombol salin/kirim
+WA, lihat `src/app/api/sekolah/pesan-harian/route.ts`) sekarang JUGA
+menyertakan nomor menu/siklus + rincian nilai gizi (energi/protein/lemak/
+karbohidrat), terpisah buat Kategori I (SD) & Kategori II (SMP ke atas) --
+sesuai contoh format WA yang dikirim Teh Lingga (2 screenshot, 26 Sep 2026).
+Info status/porsi-diterima yang udah ada TETAP dipertahankan (digabung, bukan
+diganti), per keputusan user.
+
+Field baru di `MenuHarian` (`nomorMenu`, `siklus`, 4 nilai gizi Kategori I,
+4 nilai gizi Kategori II -- lihat `prisma/schema.prisma`):
+- **Wajib diisi** di form upload & edit menu SPPG (dashboard SPPG) -- divalidasi
+  server-side lewat `src/lib/gizi.ts` (`parseGizi()`), dipakai bareng oleh
+  `POST /api/sppg/menu` & `PATCH /api/sppg/menu/[id]`.
+- **Nullable di level DB** (judgment call implementasi, bukan dari dokumen)
+  -- biar data menu lama (sebelum field ini ada) gak rusak/perlu di-backfill
+  paksa. Pesan WA otomatis nge-skip bagian nomor-menu/gizi kalau field-nya
+  null di record lama, gak nge-crash.
+- Angka desimal ditampilkan gaya Indonesia (koma, bukan titik) lewat
+  `src/lib/format.ts` (`formatAngkaID()`), mis. `16,3` bukan `16.3`.
+- Daftar menu di pesan WA dinomori otomatis dari `deskripsi` (dipisah per
+  koma) -- kalau SPPG nulis deskripsi tanpa koma, tetap ditampilkan sebagai
+  1 baris.
+
+**Kolom Prisma baru -- WAJIB jalanin `npx prisma generate && npx prisma db
+push` lagi lokal sebelum lanjut testing**, karena skema `MenuHarian` berubah.
+
 ## Belum dikerjakan (langkah berikutnya)
 
 - Proteksi role per halaman sudah ada (`requireRole()`), tapi belum ada
