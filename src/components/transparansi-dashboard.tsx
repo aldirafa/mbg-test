@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ComponentType } from "react";
+import {
+  BuildingOffice2Icon,
+  AcademicCapIcon,
+  ClipboardDocumentCheckIcon,
+  UserGroupIcon,
+  HeartIcon,
+  StarIcon,
+} from "@heroicons/react/24/outline";
 
 type Stats = {
   sppgAktif: number;
@@ -32,36 +41,56 @@ export function TransparansiDashboard() {
       {!stats && <p className="text-sm text-neutral-500">Memuat...</p>}
 
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <StatCard label="SPPG Aktif" value={String(stats.sppgAktif)} />
-          <StatCard label="Sekolah Terhubung" value={String(stats.totalSekolah)} />
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <StatCard icon={BuildingOffice2Icon} label="SPPG Aktif" value={String(stats.sppgAktif)} />
+          <StatCard icon={AcademicCapIcon} label="Sekolah Terhubung" value={String(stats.totalSekolah)} />
           <StatCard
+            icon={ClipboardDocumentCheckIcon}
             label="Konsistensi Pelaporan Sekolah"
             value={stats.konsistensiPelaporanPersen != null ? `${stats.konsistensiPelaporanPersen}%` : "-"}
           />
           <StatCard
+            icon={UserGroupIcon}
             label="Partisipasi Orangtua"
             value={stats.partisipasiOrangtuaPersen != null ? `${stats.partisipasiOrangtuaPersen}%` : "-"}
           />
           <StatCard
+            icon={HeartIcon}
             label="Kepuasan Orangtua"
             value={stats.kepuasanOrangtua != null ? `⭐ ${stats.kepuasanOrangtua.toFixed(1)}` : "-"}
           />
           <StatCard
+            icon={StarIcon}
             label="Kepuasan Keseluruhan"
             value={stats.kepuasanKeseluruhan != null ? `⭐ ${stats.kepuasanKeseluruhan.toFixed(1)}` : "-"}
           />
-        </div>
+        </dl>
       )}
     </main>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+// Kartu statistik gaya "icon badge" (terinspirasi contoh Tailwind Plus yang dikasih user),
+// diadaptasi ke tema neutral/hitam aplikasi ini -- gak pakai indikator naik/turun karena
+// belum ada data historis buat dibandingin (cuma snapshot kondisi sekarang).
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
   return (
-    <div className="border border-neutral-200 rounded-lg p-4">
-      <div className="text-2xl font-semibold">{value}</div>
-      <div className="text-xs text-neutral-500 mt-1">{label}</div>
+    <div className="relative overflow-hidden rounded-lg border border-neutral-200 px-4 pt-5 pb-4 sm:px-6 sm:pt-6">
+      <div>
+        <div className="absolute rounded-md bg-neutral-900 p-3">
+          <Icon className="size-6 text-white" />
+        </div>
+        <p className="ml-16 truncate text-sm font-medium text-neutral-500">{label}</p>
+      </div>
+      <p className="ml-16 mt-1 text-2xl font-semibold text-neutral-900">{value}</p>
     </div>
   );
 }

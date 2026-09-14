@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { PhotoIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { PengaduanPanel } from "@/components/pengaduan-panel";
+import { formatAngkaID } from "@/lib/format";
 
 type Distribusi = {
   id: string;
   status: string;
+  porsiDiterima: number | null;
+  catatan: string | null;
   sekolah: { namaSekolah: string };
 };
 
@@ -80,6 +84,32 @@ function giziFromMenu(menu: Menu): GiziForm {
 
 function setGiziOnFormData(formData: FormData, gizi: GiziForm) {
   (Object.keys(gizi) as (keyof GiziForm)[]).forEach((key) => formData.set(key, gizi[key]));
+}
+
+// Kontrol upload foto yang lebih jelas keliatan bisa diklik (feedback Teh Lingga: "Choose
+// File" bawaan browser kurang distinct) -- input aslinya disembunyikan, label yang jadi
+// kontrol visualnya, dikasih ikon + nama file yang lagi dipilih.
+function FotoInput({
+  file,
+  onChange,
+  placeholder,
+}: {
+  file: File | null;
+  onChange: (f: File | null) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="cursor-pointer flex items-center gap-2 rounded-md border border-dashed border-neutral-300 px-3 py-2.5 text-sm text-neutral-600 hover:bg-neutral-50 hover:border-neutral-400 transition-colors">
+      <PhotoIcon className="size-5 text-neutral-400 flex-shrink-0" />
+      <span className="truncate">{file ? file.name : placeholder}</span>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+        className="hidden"
+      />
+    </label>
+  );
 }
 
 function GiziFields({
@@ -163,6 +193,33 @@ function GiziFields({
   );
 }
 
+// Blok nilai gizi read-only, dipakai di rincian riwayat distribusi (bukan form edit).
+function GiziBlock({
+  label,
+  energi,
+  protein,
+  lemak,
+  karbohidrat,
+}: {
+  label: string;
+  energi: number;
+  protein: number;
+  lemak: number;
+  karbohidrat: number;
+}) {
+  return (
+    <div className="text-xs">
+      <p className="font-medium text-neutral-700">{label}</p>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-neutral-500 mt-1">
+        <span>Energi: {formatAngkaID(energi)} kkal</span>
+        <span>Protein: {formatAngkaID(protein)} g</span>
+        <span>Lemak: {formatAngkaID(lemak)} g</span>
+        <span>Karbohidrat: {formatAngkaID(karbohidrat)} g</span>
+      </div>
+    </div>
+  );
+}
+
 type EditState = { deskripsi: string; jumlahPorsi: string; foto: File | null; gizi: GiziForm };
 
 export function SppgDashboard() {
@@ -186,6 +243,16 @@ export function SppgDashboard() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   useEffect(() => {
     fetch("/api/sppg/menu")
@@ -325,12 +392,7 @@ export function SppgDashboard() {
 
           <div className="space-y-1">
             <label className="text-sm font-medium">Foto masakan (opsional)</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
-              className="w-full text-sm"
-            />
+            <FotoInput file={foto} onChange={setFoto} placeholder="Pilih foto masakan..." />
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
@@ -355,6 +417,17 @@ export function SppgDashboard() {
               const canEdit = menu.distribusi.every((d) => d.status === "dikirim");
               const isEditing = editingId === menu.id;
               const busy = rowBusy === menu.id;
+              const expanded = expandedIds.has(menu.id);
+              const adaGiziI =
+                menu.energiKategoriI != null &&
+                menu.proteinKategoriI != null &&
+                menu.lemakKategoriI != null &&
+                menu.karbohidratKategoriI != null;
+              const adaGiziII =
+                menu.energiKategoriII != null &&
+                menu.proteinKategoriII != null &&
+                menu.lemakKategoriII != null &&
+                menu.karbohidratKategoriII != null;
 
               return (
                 <div key={menu.id} className="border border-neutral-200 rounded-lg p-4 text-sm">
@@ -386,6 +459,73 @@ export function SppgDashboard() {
                           </span>
                         ))}
                       </div>
+
+                      <button
+                        onClick={() => toggleExpand(menu.id)}
+                        className="cursor-pointer mt-3 flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800"
+                      >
+                        {expanded ? (
+                          <>
+                            <ChevronUpIcon className="size-3.5" /> Sembunyikan rincian
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDownIcon className="size-3.5" /> Lihat rincian
+                          </>
+                        )}
+                      </button>
+
+                      {expanded && (
+                        <div className="mt-3 pt-3 border-t border-neutral-200 space-y-3">
+                          {menu.fotoUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={menu.fotoUrl}
+                              alt={`Foto menu: ${menu.deskripsi}`}
+                              className="w-full max-h-80 object-contain rounded-md border border-neutral-200 bg-neutral-50"
+                            />
+                          )}
+                          {(adaGiziI || adaGiziII) && (
+                            <div className="space-y-2">
+                              {adaGiziI && (
+                                <GiziBlock
+                                  label="Nilai Gizi – Kategori I (SD)"
+                                  energi={menu.energiKategoriI!}
+                                  protein={menu.proteinKategoriI!}
+                                  lemak={menu.lemakKategoriI!}
+                                  karbohidrat={menu.karbohidratKategoriI!}
+                                />
+                              )}
+                              {adaGiziII && (
+                                <GiziBlock
+                                  label="Nilai Gizi – Kategori II (SMP ke atas)"
+                                  energi={menu.energiKategoriII!}
+                                  protein={menu.proteinKategoriII!}
+                                  lemak={menu.lemakKategoriII!}
+                                  karbohidrat={menu.karbohidratKategoriII!}
+                                />
+                              )}
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-neutral-700">Detail per sekolah</p>
+                            {menu.distribusi.map((d) => (
+                              <div key={d.id} className="text-xs text-neutral-600 border border-neutral-100 rounded-md p-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-neutral-800">{d.sekolah.namaSekolah}</span>
+                                  <span>{STATUS_LABEL[d.status] ?? d.status}</span>
+                                </div>
+                                {d.porsiDiterima != null && (
+                                  <div className="mt-0.5">
+                                    Porsi diterima: {d.porsiDiterima}/{menu.jumlahPorsi}
+                                  </div>
+                                )}
+                                {d.catatan && <div className="mt-0.5 text-red-600">Catatan: {d.catatan}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {canEdit && (
                         <div className="flex gap-2 mt-3">
@@ -448,11 +588,10 @@ export function SppgDashboard() {
                       />
                       <div className="space-y-1">
                         <label className="text-xs text-neutral-500">Ganti foto (opsional)</label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => setEditState((s) => ({ ...s, foto: e.target.files?.[0] ?? null }))}
-                          className="w-full text-sm"
+                        <FotoInput
+                          file={editState.foto}
+                          onChange={(f) => setEditState((s) => ({ ...s, foto: f }))}
+                          placeholder="Pilih foto baru..."
                         />
                       </div>
                       {rowError && <p className="text-xs text-red-600">{rowError}</p>}

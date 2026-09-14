@@ -158,7 +158,7 @@ export function SekolahDashboard() {
                       <img
                         src={d.menu.fotoUrl}
                         alt={`Foto menu: ${d.menu.deskripsi}`}
-                        className="mt-2 w-full max-h-56 object-cover rounded-md border border-neutral-200"
+                        className="mt-2 w-full max-h-80 object-contain rounded-md border border-neutral-200 bg-neutral-50"
                       />
                     )}
                   </div>

@@ -5,6 +5,12 @@ import { useState } from "react";
 // Widget rating berkala (Fase 2, Bagian 6.4) -- dipakai di dashboard Sekolah & Orangtua.
 // `endpoint` beda per peran (server yang resolve sppgId buat Sekolah; Orangtua kirim
 // sppgId eksplisit lewat extraBody karena bisa punya anak di SPPG berbeda-beda).
+//
+// Backend udah support kirim berkali-kali (gak ada limit/cooldown, lihat komentar di
+// route API-nya) -- widget ini sengaja gak nyembunyiin diri permanen abis submit,
+// dikasih tombol "Kirim rating lagi" biar keliatan jelas bisa dipakai berulang
+// (feedback Teh Lingga: awalnya kelihatan cuma bisa sekali karena UI-nya nyembunyiin
+// form abis submit, bukan karena backend-nya beneran ngebatesin).
 export function RatingWidget({
   endpoint,
   extraBody,
@@ -15,6 +21,7 @@ export function RatingWidget({
   label?: string;
 }) {
   const [skor, setSkor] = useState<number | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
   const [catatan, setCatatan] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -38,19 +45,41 @@ export function RatingWidget({
     setBusy(false);
   }
 
-  if (done) {
-    return <p className="text-xs text-green-700">Makasih ratingnya!</p>;
+  function kirimLagi() {
+    setDone(false);
+    setSkor(null);
+    setHover(null);
+    setCatatan("");
+    setError(null);
   }
+
+  if (done) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-green-700">Makasih ratingnya!</p>
+        <button
+          onClick={kirimLagi}
+          className="cursor-pointer rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium"
+        >
+          Kirim rating lagi
+        </button>
+      </div>
+    );
+  }
+
+  const tampil = hover ?? skor ?? 0;
 
   return (
     <div className="space-y-2">
       <div className="text-xs font-medium text-neutral-700">{label ?? "Kasih rating"}</div>
-      <div className="flex gap-1">
+      <div className="flex gap-1" onMouseLeave={() => setHover(null)}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
+            type="button"
             onClick={() => setSkor(n)}
-            className={"text-xl leading-none " + (skor && n <= skor ? "" : "opacity-25")}
+            onMouseEnter={() => setHover(n)}
+            className={"cursor-pointer text-xl leading-none transition-opacity " + (n <= tampil ? "" : "opacity-25")}
             aria-label={`${n} bintang`}
           >
             ⭐
@@ -67,7 +96,7 @@ export function RatingWidget({
       <button
         disabled={!skor || busy}
         onClick={submit}
-        className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+        className="cursor-pointer rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {busy ? "Mengirim..." : "Kirim Rating"}
       </button>

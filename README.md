@@ -306,6 +306,36 @@ Field baru di `MenuHarian` (`nomorMenu`, `siklus`, 4 nilai gizi Kategori I,
 **Kolom Prisma baru -- WAJIB jalanin `npx prisma generate && npx prisma db
 push` lagi lokal sebelum lanjut testing**, karena skema `MenuHarian` berubah.
 
+### Perbaikan UX round pertama (feedback Teh Lingga & tim, sesi testing 14 Sep)
+
+Sekumpulan perbaikan kecil ke UI Fase 2 berdasarkan hasil coba-coba pertama:
+
+- **Rating**: kursor jadi pointer + bintang "nyala" saat di-hover (preview skor sebelum
+  diklik). Widget juga gak lagi nyembunyiin diri permanen abis submit -- ada tombol
+  "Kirim rating lagi", soalnya ternyata backend-nya emang udah support kirim berkali-kali
+  dari awal (gak ada limit/cooldown), cuma UI-nya yang bikin kelihatan cuma bisa sekali.
+- **Pengaduan**: dicek juga -- backend udah support kirim berkali-kali & submitter udah
+  bisa lihat status pengaduannya sendiri (Diterima/Ditindaklanjuti/Selesai). Diputuskan
+  gak perlu nambah visibilitas silang antar-pihak (sekolah lihat pengaduan ortu ke SPPG
+  yang sama, dst) untuk sekarang -- kalau butuh, udah ada panel Dinas yang pegang semua.
+- **Foto menu**: gak di-crop lagi (`object-contain` bukan `object-cover`) di semua tempat
+  foto ditampilkan (Sekolah, SPPG, Orangtua).
+- **Portal SPPG**: riwayat distribusi sekarang punya bagian "Lihat rincian" yang expand
+  -- nampilin foto, nilai gizi lengkap Kategori I/II, dan detail per sekolah (status,
+  porsi diterima, catatan bermasalah). Input upload foto diganti dari `<input
+  type="file">` polos jadi kontrol custom (ikon + nama file) biar jelas bisa diklik.
+- **Portal Orang Tua**: sekarang pakai `DashboardShell` yang sama kayak portal lain
+  (konsisten tampilannya), dan tiap anak punya bagian "Lihat rincian menu" (expand) yang
+  nampilin nomor menu/siklus, nilai gizi, & foto menu -- data ini sebenarnya udah
+  dikirim API-nya dari awal, cuma belum ditampilkan di UI.
+- **Transparansi**: kartu statistik dirombak gaya "icon badge" (terinspirasi contoh
+  Tailwind Plus dari user, `@heroicons/react`), diadaptasi ke tema neutral/hitam
+  aplikasi ini. Gak pakai indikator naik/turun kayak contohnya karena belum ada data
+  historis buat dibandingin -- baru snapshot kondisi sekarang.
+
+Package baru ditambahin user buat ini semua: `@heroicons/react`, `@headlessui/react`,
+`motion`, `clsx` (project juga pindah dari npm ke bun buat package manager-nya).
+
 ## Belum dikerjakan (langkah berikutnya)
 
 - Proteksi role per halaman sudah ada (`requireRole()`), tapi belum ada
