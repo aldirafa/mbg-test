@@ -435,6 +435,28 @@ level DB (`MenuItem` sbg relasi baru, `Sekolah.jenjang` default `SMA`, dst) biar
 lama gak rusak -- tapi kode API/UI baru mengasumsikan field-field ini ada, jadi migrasi
 DB-nya wajib jalan duluan.
 
+### Fix & tambahan kecil setelah revisi 14 Sep (feedback testing lokal)
+
+- **Bugfix**: `Select` (`src/components/ui/select.tsx`) sempat munculin warning React
+  "changing from uncontrolled to controlled" pas dipakai di form upload menu SPPG --
+  gara-gara Headless UI `Listbox` dikasih `value={undefined}` pas belum ada yang
+  dipilih, baru defined begitu user milih. Fix: internal-nya sekarang selalu dikasih
+  value defined (sentinel string kosong `""` buat "belum pilih"), disaring lagi di
+  `onChange` biar API komponennya (`T | null`) gak berubah dari sisi pemakai.
+- **Field baru "Sumber" per item menu** (`MenuItem.sumber`, enum `SumberGizi`:
+  karbohidrat/energi/lemak/protein) -- dropdown single-select manual buat nandain item
+  itu representasi sumber gizi apa. Ini **gantiin total** sistem highlight otomatis
+  berdasarkan nama menu yang sempat dibuat di revisi sebelumnya (`highlightUntukNama`
+  di `src/lib/menu-item-opsi.ts` udah dihapus) -- keputusan eksplisit user: gak ada lagi
+  tebakan otomatis dari nama, semua ditandain manual. Nullable di level DB (pola yang
+  sama kayak field-field lain), wajib diisi di form/API (`src/lib/menu-item-schema.ts`).
+  Tampil di rincian riwayat SPPG & Sekolah, belum ditambahin ke pesan WA siap-bagi
+  (dianggap data internal SPPG, bukan info yang perlu diteruskan ke sekolah/ortu --
+  gampang ditambahin nanti kalau ternyata dibutuhkan).
+
+**Ada field baru lagi di `MenuItem` -- jalanin `npx prisma generate && npx prisma db
+push` sekali lagi lokal.**
+
 ## Belum dikerjakan (langkah berikutnya)
 
 - Proteksi role per halaman sudah ada (`requireRole()`), tapi belum ada

@@ -28,8 +28,19 @@ export function Select<T extends string = string>({
   className?: string;
 }) {
   const selected = options.find((o) => o.value === value) ?? null;
+  // Listbox HARUS selalu dikasih value yang defined (gak pernah undefined) -- kalau
+  // enggak, dia mulai dari mode uncontrolled terus pas value pertama kali keisi jadi
+  // controlled, React ngewarning "changing from uncontrolled to controlled". Makanya
+  // dipakein sentinel string kosong buat "belum pilih apa-apa", disaring lagi di
+  // onChange biar konsumen komponen ini tetep terima null/T aja (gak pernah "").
   return (
-    <Listbox value={value ?? undefined} onChange={onChange} disabled={disabled}>
+    <Listbox
+      value={value ?? ""}
+      onChange={(v) => {
+        if (v !== "") onChange(v as T);
+      }}
+      disabled={disabled}
+    >
       <div className={clsx("relative", className)}>
         <ListboxButton className="cursor-pointer relative w-full rounded-md border border-neutral-300 bg-white py-2 pl-3 pr-10 text-left text-sm disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-neutral-900">
           <span className={clsx("block truncate", !selected && "text-neutral-400")}>

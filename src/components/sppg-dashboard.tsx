@@ -13,7 +13,8 @@ import { Expandable } from "@/components/ui/expandable";
 import { RingkasanGiziSiklus } from "@/components/gizi-siklus-summary";
 import { formatAngkaID } from "@/lib/format";
 import { TZ_OPSI as TZ_OPSI_BASE, TZ_TIMEZONE, isoKeTanggalJam, tanggalJamSekarang, tanggalJamTzKeIso, type Tz } from "@/lib/waktu";
-import { OPSI_MENU_ITEM, highlightUntukNama, type KategoriNutrisi } from "@/lib/menu-item-opsi";
+import { OPSI_MENU_ITEM } from "@/lib/menu-item-opsi";
+import { SUMBER_GIZI_OPSI, LABEL_SUMBER_GIZI, type SumberGizi } from "@/lib/sumber-gizi";
 import type { JenjangBgn } from "@/lib/bgn";
 import {
   KATEGORI_DISABILITAS,
@@ -27,6 +28,7 @@ type MenuItemData = {
   id: string;
   siklus: number;
   namaMenu: string;
+  sumber: SumberGizi | null;
   energi: number;
   karbohidrat: number;
   lemak: number;
@@ -96,10 +98,13 @@ const TZ_OPSI = TZ_OPSI_BASE;
 
 // --- Form item menu (state lokal, semua nilai numerik disimpan sbg string) ---------
 
+type NutrisiKey = "energi" | "karbohidrat" | "lemak" | "proteinHewani" | "proteinNabati";
+
 type ItemForm = {
   key: string;
   siklus: string;
   namaMenu: string;
+  sumber: SumberGizi | "";
   energi: string;
   karbohidrat: string;
   lemak: string;
@@ -118,6 +123,7 @@ function itemKosong(siklus = "1"): ItemForm {
     key: buatKey(),
     siklus,
     namaMenu: "",
+    sumber: "",
     energi: "",
     karbohidrat: "",
     lemak: "",
@@ -134,6 +140,7 @@ function itemFormDariData(items: MenuItemData[]): ItemForm[] {
     key: buatKey(),
     siklus: String(it.siklus),
     namaMenu: it.namaMenu,
+    sumber: it.sumber ?? "",
     energi: String(it.energi),
     karbohidrat: String(it.karbohidrat),
     lemak: String(it.lemak),
@@ -208,6 +215,7 @@ function buildFormData(v: MenuFormValue): FormData {
       v.items.map((it) => ({
         siklus: Number(it.siklus),
         namaMenu: it.namaMenu.trim(),
+        sumber: it.sumber,
         energi: Number(it.energi),
         karbohidrat: Number(it.karbohidrat),
         lemak: Number(it.lemak),
@@ -219,14 +227,6 @@ function buildFormData(v: MenuFormValue): FormData {
     )
   );
   return fd;
-}
-
-// Highlight border/bg field nutrisi yg relevan sama nama menu yg lagi diketik/dipilih
-// (kesepakatan tim: mis. "susu" nge-highlight Protein Hewani + Lemak sekaligus).
-function kelasHighlight(kategori: KategoriNutrisi, aktif: KategoriNutrisi[]) {
-  return aktif.includes(kategori)
-    ? "border-amber-400 bg-amber-50 ring-1 ring-amber-300"
-    : "border-neutral-300";
 }
 
 // --- Ringkasan nilai gizi per siklus + evaluasi BGN (SMA aja utk sekarang) ---------
@@ -252,12 +252,11 @@ function ItemEditor({
     onChange([...items, itemKosong(siklusTerakhir)]);
   }
 
-  const namaOpsi = OPSI_MENU_ITEM.map((o) => o.nama);
+  const namaOpsi = OPSI_MENU_ITEM;
 
   return (
     <div className="space-y-3">
       {items.map((item, idx) => {
-        const highlight = highlightUntukNama(item.namaMenu);
         return (
           <div key={item.key} className="rounded-md border border-neutral-200 p-3 space-y-2.5">
             <div className="flex items-center justify-between">
@@ -297,6 +296,16 @@ function ItemEditor({
               </div>
             </div>
 
+            <div className="space-y-1">
+              <label className="text-xs text-neutral-500">Sumber</label>
+              <Select
+                value={item.sumber || null}
+                onChange={(v) => update(item.key, { sumber: v })}
+                options={SUMBER_GIZI_OPSI}
+                placeholder="Item ini sumber apa?"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-2.5">
               {(
                 [
@@ -305,7 +314,7 @@ function ItemEditor({
                   ["lemak", "Lemak (g)"],
                   ["proteinHewani", "Protein Hewani (g)"],
                   ["proteinNabati", "Protein Nabati (g)"],
-                ] as [KategoriNutrisi, string][]
+                ] as [NutrisiKey, string][]
               ).map(([key, label]) => (
                 <div key={key} className="space-y-1">
                   <label className="text-xs text-neutral-500">{label}</label>
@@ -316,7 +325,7 @@ function ItemEditor({
                     min={0}
                     value={item[key]}
                     onChange={(e) => update(item.key, { [key]: e.target.value } as Partial<ItemForm>)}
-                    className={`w-full rounded-md border px-3 py-2 text-sm transition-colors ${kelasHighlight(key, highlight)}`}
+                    className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
                   />
                 </div>
               ))}
@@ -622,6 +631,9 @@ function RincianMenu({ menu }: { menu: Menu }) {
                     <span className="font-medium text-neutral-800">{it.namaMenu}</span>
                     <span className="text-neutral-400">Siklus {it.siklus}</span>
                   </div>
+                  {it.sumber && (
+                    <p className="text-neutral-500 mt-0.5">Sumber: {LABEL_SUMBER_GIZI[it.sumber]}</p>
+                  )}
                   <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-neutral-500 mt-1">
                     <span>Energi: {formatAngkaID(it.energi)} kkal</span>
                     <span>Karbohidrat: {formatAngkaID(it.karbohidrat)} g</span>

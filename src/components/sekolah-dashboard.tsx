@@ -15,11 +15,13 @@ import { CHECKLIST_BGN } from "@/lib/bgn-checklist";
 import { TZ_OPSI, TZ_TIMEZONE, type Tz, tanggalJamSekarang, tanggalJamTzKeIso } from "@/lib/waktu";
 import { SegmentedRadioGroup } from "@/components/ui/radio-group";
 import type { JenjangBgn } from "@/lib/bgn";
+import { LABEL_SUMBER_GIZI, type SumberGizi } from "@/lib/sumber-gizi";
 
 type MenuItemData = {
   id: string;
   siklus: number;
   namaMenu: string;
+  sumber: SumberGizi | null;
   energi: number;
   karbohidrat: number;
   lemak: number;
@@ -250,6 +252,7 @@ function RincianDistribusi({ d, sekolahJenjang }: { d: Distribusi; sekolahJenjan
                   <span className="font-medium text-neutral-800">{it.namaMenu}</span>
                   <span className="text-neutral-400">Siklus {it.siklus}</span>
                 </div>
+                {it.sumber && <p className="text-neutral-500 mt-0.5">Sumber: {LABEL_SUMBER_GIZI[it.sumber]}</p>}
               </div>
             ))}
           </div>

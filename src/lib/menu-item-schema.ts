@@ -6,6 +6,7 @@ import { z } from "zod";
 export const menuItemInputSchema = z.object({
   siklus: z.number().int().positive(),
   namaMenu: z.string().trim().min(1),
+  sumber: z.enum(["karbohidrat", "energi", "lemak", "protein"]),
   energi: z.number().nonnegative(),
   karbohidrat: z.number().nonnegative(),
   lemak: z.number().nonnegative(),

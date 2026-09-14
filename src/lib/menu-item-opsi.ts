@@ -1,74 +1,48 @@
-// Daftar nama menu default (buat opsi combobox creatable di form item menu SPPG) +
-// kategori nutrisi yg otomatis di-highlight pas nama itu dipilih/diketik. User boleh
-// tetep ngetik nama bebas (creatable) -- daftar ini cuma bantuan cepat & pemicu
-// highlight, bukan validasi/batasan.
+// Daftar nama menu default -- bantuan cepat buat combobox creatable di form item menu
+// SPPG. User tetap bebas ngetik nama bebas (creatable); daftar ini cuma opsi cepat,
+// bukan validasi/batasan.
 //
-// Kategori nutrisi yg bisa di-highlight: "energi" | "karbohidrat" | "lemak" |
-// "proteinHewani" | "proteinNabati". Satu nama menu boleh nge-trigger lebih dari satu
-// kategori sekaligus (mis. "susu" -> proteinHewani + lemak, kesepakatan eksplisit user).
-
-export type KategoriNutrisi = "energi" | "karbohidrat" | "lemak" | "proteinHewani" | "proteinNabati";
-
-export type OpsiMenuItem = {
-  nama: string;
-  highlight: KategoriNutrisi[];
-};
-
-export const OPSI_MENU_ITEM: OpsiMenuItem[] = [
+// CATATAN: dulu tiap nama di sini juga punya mapping "kategori nutrisi yang di-
+// highlight otomatis" (mis. "Susu" -> Protein Hewani + Lemak). Fitur itu DIHAPUS &
+// digantiin field "Sumber" manual per item (single-select, lihat src/lib/sumber-
+// gizi.ts) -- keputusan eksplisit user supaya kategorisasi gizi selalu ditandain
+// manual, gak ditebak dari nama.
+export const OPSI_MENU_ITEM: string[] = [
   // Sumber karbohidrat / energi utama
-  { nama: "Nasi putih", highlight: ["karbohidrat", "energi"] },
-  { nama: "Nasi merah", highlight: ["karbohidrat", "energi"] },
-  { nama: "Mie", highlight: ["karbohidrat", "energi"] },
-  { nama: "Kentang", highlight: ["karbohidrat", "energi"] },
-  { nama: "Singkong", highlight: ["karbohidrat", "energi"] },
-  { nama: "Jagung", highlight: ["karbohidrat", "energi"] },
-  { nama: "Roti", highlight: ["karbohidrat", "energi"] },
+  "Nasi putih",
+  "Nasi merah",
+  "Mie",
+  "Kentang",
+  "Singkong",
+  "Jagung",
+  "Roti",
 
   // Protein hewani
-  { nama: "Ayam", highlight: ["proteinHewani"] },
-  { nama: "Ikan", highlight: ["proteinHewani"] },
-  { nama: "Telur", highlight: ["proteinHewani"] },
-  { nama: "Daging sapi", highlight: ["proteinHewani"] },
-  { nama: "Bakso", highlight: ["proteinHewani"] },
-
-  // Susu -- trigger dobel per kesepakatan eksplisit (proteinHewani + lemak)
-  { nama: "Susu", highlight: ["proteinHewani", "lemak"] },
+  "Ayam",
+  "Ikan",
+  "Telur",
+  "Daging sapi",
+  "Bakso",
+  "Susu",
 
   // Protein nabati
-  { nama: "Tahu", highlight: ["proteinNabati"] },
-  { nama: "Tempe", highlight: ["proteinNabati"] },
-  { nama: "Kacang-kacangan", highlight: ["proteinNabati"] },
+  "Tahu",
+  "Tempe",
+  "Kacang-kacangan",
 
-  // Sayur (dianggap kontribusi kecil ke semua, gak di-highlight khusus -- opsional
-  // dipilih tanpa ngubah highlight apa pun)
-  { nama: "Sayur bayam", highlight: [] },
-  { nama: "Sayur kangkung", highlight: [] },
-  { nama: "Sayur sop", highlight: [] },
-  { nama: "Tumis kacang panjang", highlight: [] },
+  // Sayur
+  "Sayur bayam",
+  "Sayur kangkung",
+  "Sayur sop",
+  "Tumis kacang panjang",
 
   // Sumber lemak
-  { nama: "Minyak goreng", highlight: ["lemak"] },
-  { nama: "Santan", highlight: ["lemak"] },
-  { nama: "Keju", highlight: ["lemak", "proteinHewani"] },
+  "Minyak goreng",
+  "Santan",
+  "Keju",
 
-  // Buah (energi ringan dari gula alami)
-  { nama: "Buah pisang", highlight: ["energi"] },
-  { nama: "Buah jeruk", highlight: ["energi"] },
-  { nama: "Buah semangka", highlight: ["energi"] },
+  // Buah
+  "Buah pisang",
+  "Buah jeruk",
+  "Buah semangka",
 ];
-
-// Gabungin highlight dari nama menu yg cocok persis (case-insensitive) dgn daftar di
-// atas. Nama yg gak ada di daftar (murni custom/creatable) -> array kosong, gak ada
-// highlight otomatis.
-export function highlightUntukNama(nama: string): KategoriNutrisi[] {
-  const cocok = OPSI_MENU_ITEM.find((o) => o.nama.toLowerCase() === nama.trim().toLowerCase());
-  return cocok ? cocok.highlight : [];
-}
-
-export const LABEL_KATEGORI_NUTRISI: Record<KategoriNutrisi, string> = {
-  energi: "Energi",
-  karbohidrat: "Karbohidrat",
-  lemak: "Lemak",
-  proteinHewani: "Protein Hewani",
-  proteinNabati: "Protein Nabati",
-};

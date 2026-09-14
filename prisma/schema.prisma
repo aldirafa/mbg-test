@@ -50,6 +50,13 @@ enum WaktuMakan {
   siang
 }
 
+enum SumberGizi {
+  karbohidrat
+  energi
+  lemak
+  protein
+}
+
 model User {
   id           String   @id @default(cuid())
   nama         String
@@ -204,6 +211,12 @@ model MenuItem {
   proteinNabati      Float    @map("protein_nabati")
   pakaiPanganLokal   Boolean  @default(false) @map("pakai_pangan_lokal")
   panganLokalRincian String?  @map("pangan_lokal_rincian")
+  // Tag kategori "item ini sumber apa" (feedback user stlh revisi item-per-item) --
+  // single-select, GANTIIN sistem highlight otomatis berdasarkan nama menu yg sempat
+  // ada di UI (src/lib/menu-item-opsi.ts, udah dihapus). Nullable di DB (pola yg sama
+  // kayak field2 lain di proyek ini) krn MenuItem yg keburu dibuat sebelum field ini
+  // ada gak punya nilainya -- tapi WAJIB diisi di form/API buat item baru.
+  sumber             SumberGizi? @map("sumber")
 
   menu MenuHarian @relation(fields: [menuId], references: [id], onDelete: Cascade)
 
