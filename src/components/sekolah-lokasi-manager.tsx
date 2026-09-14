@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/react";
+import { ChevronDownIcon } from "@heroicons/react/20/solid";
 
 type SekolahRow = { id: string; namaSekolah: string; lat: number | null; lng: number | null };
 
@@ -48,11 +50,12 @@ export function SekolahLokasiManager() {
   }
 
   return (
-    <div className="border border-neutral-200 rounded-lg p-4 text-sm">
-      <button onClick={() => setOpen((o) => !o)} className="font-medium text-sm">
+    <Disclosure as="div" className="border border-neutral-200 rounded-lg p-4 text-sm">
+      <DisclosureButton onClick={() => setOpen((o) => !o)} className="cursor-pointer flex items-center gap-1.5 font-medium text-sm">
+        <ChevronDownIcon className={`size-4 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
         {open ? "Sembunyikan" : "Kelola"} Titik Lokasi Sekolah (geo-fence Suara Anak)
-      </button>
-      {open && (
+      </DisclosureButton>
+      <DisclosurePanel>
         <div className="mt-3 space-y-3">
           {loading && <p className="text-xs text-neutral-500">Memuat...</p>}
           {!loading &&
@@ -86,7 +89,7 @@ export function SekolahLokasiManager() {
               </div>
             ))}
         </div>
-      )}
-    </div>
+      </DisclosurePanel>
+    </Disclosure>
   );
 }

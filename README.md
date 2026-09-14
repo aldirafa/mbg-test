@@ -336,6 +336,105 @@ Sekumpulan perbaikan kecil ke UI Fase 2 berdasarkan hasil coba-coba pertama:
 Package baru ditambahin user buat ini semua: `@heroicons/react`, `@headlessui/react`,
 `motion`, `clsx` (project juga pindah dari npm ke bun buat package manager-nya).
 
+### Revisi besar rapat tim 14 Sep -- item-per-item, evaluasi gizi BGN, alur
+### penerimaan Sekolah, kebutuhan khusus, & sapuan Headless UI/Heroicons
+
+Revisi paling gede sejauh ini, dari hasil rapat tim + Teh Lingga. Beberapa keputusan
+arsitektur diambil lewat tanya-jawab sama user sebelum implementasi -- dicatat di sini:
+
+**Model menu jadi item-per-item (ganti total dari deskripsi tunggal + gizi flat):**
+- `MenuHarian.deskripsi` & 8 field gizi Kategori I/II lama sekarang **legacy-only**
+  (dibiarkan nullable, cuma buat nampilin data lama) -- record baru pakai relasi
+  `MenuItem[]` (nama, siklus, energi/karbo/lemak/protein hewani & nabati, opsi pangan
+  lokal). **Tiap item boleh punya siklus sendiri-sendiri** dalam 1 upload (bukan 1
+  siklus per menu) -- ringkasan gizi & evaluasi BGN dihitung & ditampilkan per siklus
+  yang muncul di item-itemnya.
+- Nama item pakai combobox creatable (`src/lib/menu-item-opsi.ts`) -- ada daftar nama
+  umum yang otomatis nge-highlight kolom nutrisi terkait pas dipilih/diketik (mis.
+  "Susu" highlight Protein Hewani **dan** Lemak sekaligus), tapi user tetap bebas ngetik
+  nama custom.
+
+**Evaluasi kecukupan gizi BGN (hijau/kuning/merah)** -- `src/lib/bgn.ts`:
+- Ambang batas Energi/Protein/Lemak/Karbohidrat **cuma ada dari tim buat jenjang SMA -
+  Makan Siang**. Ambang SMA - Makan Pagi **belum ada angka resmi** -- atas arahan user,
+  sementara dipakein angka Makan Siang sbg placeholder, disimpen di key terpisah biar
+  gampang diganti nanti tanpa nyentuh angka Makan Siang. Jenjang SD/SMP belum ada
+  ambang sama sekali -> evaluasi dilewatin (bukan ditebak), badge-nya nampilin
+  "Belum ada standar evaluasi".
+- Aturan traffic-light: hijau = dalam rentang; kuning = di luar rentang tapi masih
+  dalam toleransi 10% dari batas yang dilanggar; merah = lebih dari 10% di luar.
+- `Sekolah.jenjang` (enum, default `SMA`) field baru -- nentuin ambang mana yang dipakai.
+
+**SPPG: upload menu sekarang targetnya SATU sekolah + SATU waktu makan (ganti total)**
+-- dulu otomatis broadcast ke semua sekolah di `sppg.sekolahList`, sekarang SPPG pilih
+sekolah tujuan (dropdown) & Pagi/Siang per upload, plus porsi umum/khusus, nomor menu,
+& waktu kirim manual (tanggal+jam+zona WIB/WITA/WIT, bukan otomatis `Date.now()`).
+**TODO produk final** (diminta dicatat eksplisit oleh user): mekanisme assign
+SPPG&harr;Sekolah masih prototype -- sekarang semua sekolah test dianggap dilayani 1
+SPPG yang sama lewat `sppg.sekolahList` apa adanya. Perlu didesain ulang bareng tim
+sebelum rilis (mis. gimana kalau 1 sekolah dilayani lebih dari 1 SPPG, atau
+assignment-nya per periode).
+
+**Sekolah: alur konfirmasi penerimaan dirombak total** (`/api/sekolah/konfirmasi`):
+- Waktu terima sekarang input manual (tanggal+jam+zona), **otomatis dicek vs batas 4
+  jam sejak `waktuKirim`**.
+- Porsi diterima dipecah jadi umum & khusus (field lama `porsiDiterima` masih
+  disimpen sbg total gabungan, buat kompatibilitas tampilan/pesan WA lama).
+- Tambah input jumlah layak & tidak layak (hasil pemeriksaan fisik).
+- **Checklist pra-penerimaan BGN penuh** (`src/lib/bgn-checklist.ts`, 9 item wajib + 2
+  opsional -- suhu & kebutuhan khusus) wajib diisi. Kalau ADA item wajib yang gagal
+  (atau waktu terima lewat 4 jam), penerimaan **otomatis diblokir** -- distribusi
+  langsung berubah jadi status `bermasalah` (bukan `diterima`), pakai mekanisme
+  `catatan` yang sudah ada (bukan bikin entitas rejection baru), dengan ringkasan item
+  yang gagal ditulis otomatis. Ini masuk ke alur `checkTriangulasi` yang sama kayak
+  komplain manual.
+- **Catatan transkripsi**: teks checklist dari user ada 1 typo kecil ("Hasi pemeriksaan
+  tekstur") yang dibetulin jadi "Hasil pemeriksaan tekstur" biar konsisten sama 3 item
+  pemeriksaan sensorik lainnya yang pola kalimatnya sama persis. Kalau ternyata memang
+  disengaja, gampang dikembaliin di `src/lib/bgn-checklist.ts`.
+
+**Data kebutuhan khusus siswa** (`src/lib/kebutuhan-khusus.ts`, field baru di
+`Sekolah`: `jenjang`, `disabilitasData`, `alergiData`):
+- Kategori disabilitas A-E (tunanetra/tunarungu/tunagrahita/tunadaksa/tunalaras) --
+  hasil riset klasifikasi pendidikan khusus Indonesia (kategori G/multi-disabilitas
+  sengaja gak dimasukin, gak diminta user).
+- Kategori alergi/pantangan gabungan "Big 9" FARE (standar internasional yang paling
+  umum dirujuk) + contoh yang dikasih user sendiri (nasi, intoleransi laktosa/gluten,
+  dll).
+- Sekolah isi lewat form baru di dashboard-nya (`SekolahKebutuhanKhususForm`) --
+  jumlah + catatan opsional per kategori.
+- Portal SPPG dapat panel ringkasan (`PanelKebutuhanKhusus`, floating/sticky di layar
+  besar, stack biasa di layar kecil) yang menjumlahkan data ini dari semua sekolah yang
+  dilayani -- dipakai buat nyiapin porsi khusus.
+
+**Sekolah: riwayat distribusi dikelompokkan per status** (Menunggu Konfirmasi /
+Bermasalah / Diterima), masing-masing seksi expandable (Headless UI Disclosure) plus
+"Lihat rincian" per baris (foto, item menu + evaluasi gizi per siklus, jawaban
+checklist BGN kalau udah ada). Fitur pengelompokan ini **cuma di Portal Sekolah**
+sesuai permintaan -- SPPG & Orang Tua di luar cakupan revisi ini.
+
+**Sapuan Headless UI + Heroicons** (instruksi umum: maksimalkan penggunaan keduanya di
+semua form, ganti kontrol HTML polos):
+- Primitive baru di `src/components/ui/`: `Select` (Listbox), `LabeledCheckbox`
+  (Checkbox+Field), `SegmentedRadioGroup` (RadioGroup), `CreatableCombobox` (Combobox),
+  `FileInput` (diekstrak dari `FotoInput` SPPG biar dipakai ulang), `Expandable`
+  (Disclosure generik + helper badge warna status gizi).
+- Semua form baru (upload menu SPPG, konfirmasi Sekolah, kebutuhan khusus) pakai
+  primitive ini. Toggle manual "Sembunyikan/Kelola ..." di beberapa panel Dinas
+  (`FeedbackAnakViewer`, `PengaduanManager`, `SekolahLokasiManager`) & filter status di
+  `DinasDashboard` juga diganti ke Headless UI Disclosure/RadioGroup.
+- **Sengaja gak diutak-atik** (audit menemukan kandidat tapi risikonya lebih besar dari
+  manfaatnya buat revisi ini): tombol bintang `RatingWidget` & tombol emoji 😋/🍽️ di
+  `SuaraAnakForm` -- keduanya UI custom yang udah divalidasi user di ronde feedback
+  sebelumnya, ganti ke `RadioGroup` generik berisiko regresi visual utk manfaat yang
+  marginal. Kalau user mau, ini gampang dikerjain terpisah.
+
+**Kolom Prisma baru (banyak) -- WAJIB jalanin `npx prisma generate && npx prisma db
+push` lagi lokal sebelum lanjut testing.** Semua field baru nullable/ada default di
+level DB (`MenuItem` sbg relasi baru, `Sekolah.jenjang` default `SMA`, dst) biar data
+lama gak rusak -- tapi kode API/UI baru mengasumsikan field-field ini ada, jadi migrasi
+DB-nya wajib jalan duluan.
+
 ## Belum dikerjakan (langkah berikutnya)
 
 - Proteksi role per halaman sudah ada (`requireRole()`), tapi belum ada

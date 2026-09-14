@@ -5,6 +5,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { SekolahLokasiManager } from "@/components/sekolah-lokasi-manager";
 import { PengaduanManager } from "@/components/pengaduan-manager";
 import { FeedbackAnakViewer } from "@/components/feedback-anak-viewer";
+import { SegmentedRadioGroup } from "@/components/ui/radio-group";
 
 type Flag = {
   id: string;
@@ -98,22 +99,7 @@ export function DinasDashboard() {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          {FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={
-                "text-xs font-medium rounded-full px-3.5 py-1.5 border " +
-                (filter === f.value
-                  ? "bg-neutral-900 text-white border-neutral-900"
-                  : "bg-white text-neutral-600 border-neutral-300")
-              }
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedRadioGroup value={filter} onChange={setFilter} options={FILTERS} />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
           <div className="border border-neutral-200 rounded-lg divide-y divide-neutral-200 overflow-hidden">

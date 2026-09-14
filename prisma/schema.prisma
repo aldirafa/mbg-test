@@ -39,6 +39,17 @@ enum StatusFlag {
   selesai
 }
 
+enum Jenjang {
+  SD
+  SMP
+  SMA
+}
+
+enum WaktuMakan {
+  pagi
+  siang
+}
+
 model User {
   id           String   @id @default(cuid())
   nama         String
@@ -78,9 +89,18 @@ model Sekolah {
   alamat       String
   sppgId       String @map("sppg_id")
   jumlahSiswa  Int?   @map("jumlah_siswa")
+  // Jenjang pendidikan -- dipakai buat nentuin ambang batas evaluasi gizi BGN
+  // (src/lib/bgn.ts). Default SMA krn baru itu yang datanya tersedia; jenjang lain
+  // blm punya ambang batas resmi (lihat catatan di lib/bgn.ts & README).
+  jenjang      Jenjang @default(SMA)
   // Lokasi sekolah, dipakai sbg titik acuan geo-gate Child Voice Interface (Fase 2)
   lat          Float?
   lng          Float?
+  // Data disabilitas (kategori A-E) & alergi/pantangan siswa, diisi sekolah.
+  // Bentuk: { [kategori]: { count: number, catatan?: string } } -- lihat
+  // src/lib/kebutuhan-khusus.ts buat daftar kategori & shape lengkapnya.
+  disabilitasData Json? @map("disabilitas_data")
+  alergiData      Json? @map("alergi_data")
 
   user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   sppg   Sppg      @relation(fields: [sppgId], references: [id])
@@ -127,8 +147,17 @@ model MenuHarian {
   id            String   @id @default(cuid())
   sppgId        String   @map("sppg_id")
   tanggal       DateTime @db.Date
-  deskripsi     String
+  // LEGACY: dipakai sebelum model item-per-item (MenuItem) ada. Dibiarkan nullable
+  // biar data lama masih bisa ditampilkan; record baru pakai relasi `items` di bawah.
+  deskripsi     String?
   fotoUrl       String?  @map("foto_url")
+  // Menu skrg ditarget ke SATU sekolah + SATU waktu makan per upload (lihat Distribusi
+  // utk sekolah mana; ini nyimpen pagi/siang-nya). TODO produk final: mekanisme
+  // assign SPPG<->sekolah msh prototype (skrg semua sekolah test dianggap dilayani
+  // 1 SPPG yg sama) -- perlu didesain ulang bareng tim sblm rilis.
+  untukWaktu    WaktuMakan? @map("untuk_waktu")
+  porsiUmum     Int?     @map("porsi_umum")
+  porsiKhusus   Int?     @map("porsi_khusus")
   // Geotag = bukti lokasi produksi/pengiriman (evidence), BUKAN gate akses
   geotagKirimLat Float?  @map("geotag_kirim_lat")
   geotagKirimLng Float?  @map("geotag_kirim_lng")
@@ -153,8 +182,32 @@ model MenuHarian {
 
   sppg        Sppg         @relation(fields: [sppgId], references: [id])
   distribusi  Distribusi[]
+  items       MenuItem[]
 
   @@map("menu_harian")
+}
+
+// Item makanan per menu -- satu upload menu bisa berisi banyak item, masing-masing
+// boleh beda siklus (rekap gizi ditampilkan per-siklus, bukan digabung jadi satu).
+// Gantiin model lama deskripsi tunggal + gizi flat Kategori I/II di atas (yg skrg
+// legacy-only). Lihat src/lib/menu-item-opsi.ts utk daftar nama menu default &
+// kategori nutrisi yg di-highlight otomatis pas nama menu dipilih/diketik.
+model MenuItem {
+  id                 String   @id @default(cuid())
+  menuId             String   @map("menu_id")
+  siklus             Int
+  namaMenu           String   @map("nama_menu")
+  energi             Float
+  karbohidrat        Float
+  lemak              Float
+  proteinHewani      Float    @map("protein_hewani")
+  proteinNabati      Float    @map("protein_nabati")
+  pakaiPanganLokal   Boolean  @default(false) @map("pakai_pangan_lokal")
+  panganLokalRincian String?  @map("pangan_lokal_rincian")
+
+  menu MenuHarian @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@map("menu_item")
 }
 
 model Distribusi {
@@ -165,6 +218,16 @@ model Distribusi {
   waktuKirim       DateTime?         @map("waktu_kirim")
   waktuTerima      DateTime?         @map("waktu_terima")
   porsiDiterima    Int?              @map("porsi_diterima")
+  // Pecahan porsi diterima umum/khusus (revisi rapat tim) -- porsiDiterima di atas
+  // dibiarkan sbg legacy/total, field baru ini yg dipakai form penerimaan baru.
+  porsiDiterimaUmum   Int?           @map("porsi_diterima_umum")
+  porsiDiterimaKhusus Int?           @map("porsi_diterima_khusus")
+  layakCount          Int?           @map("layak_count")
+  tidakLayakCount     Int?           @map("tidak_layak_count")
+  // Jawaban checklist pra-penerimaan BGN (9 poin, lihat src/lib/bgn-checklist.ts).
+  // Bentuk: { [itemId]: boolean }. Kalau ada item wajib yg gagal, status otomatis
+  // "bermasalah" & catatan diisi ringkasan item yg gagal (lihat API konfirmasi sekolah).
+  checklistBgn        Json?          @map("checklist_bgn")
   fotoTerimaUrl    String?           @map("foto_terima_url")
   // Geotag = bukti lokasi (evidence), BUKAN gate akses -- beda peran dgn feedback_anak (Fase 2)
   geotagTerimaLat  Float?            @map("geotag_terima_lat")

@@ -16,7 +16,7 @@ export async function GET() {
   const distribusi = await prisma.distribusi.findMany({
     where: { sekolahId: sekolah.id },
     orderBy: { waktuKirim: "desc" },
-    include: { menu: { include: { sppg: true } } },
+    include: { menu: { include: { sppg: true, items: true } } },
     take: 20,
   });
 

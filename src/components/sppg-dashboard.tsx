@@ -1,26 +1,66 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { PhotoIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
+import { ChevronDownIcon, ChevronUpIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { PengaduanPanel } from "@/components/pengaduan-panel";
+import { Select, type SelectOption } from "@/components/ui/select";
+import { SegmentedRadioGroup } from "@/components/ui/radio-group";
+import { CreatableCombobox } from "@/components/ui/combobox";
+import { LabeledCheckbox } from "@/components/ui/checkbox";
+import { FileInput } from "@/components/ui/file-input";
+import { Expandable } from "@/components/ui/expandable";
+import { RingkasanGiziSiklus } from "@/components/gizi-siklus-summary";
 import { formatAngkaID } from "@/lib/format";
+import { TZ_OPSI as TZ_OPSI_BASE, TZ_TIMEZONE, isoKeTanggalJam, tanggalJamSekarang, tanggalJamTzKeIso, type Tz } from "@/lib/waktu";
+import { OPSI_MENU_ITEM, highlightUntukNama, type KategoriNutrisi } from "@/lib/menu-item-opsi";
+import type { JenjangBgn } from "@/lib/bgn";
+import {
+  KATEGORI_DISABILITAS,
+  KATEGORI_ALERGI,
+  type DataKebutuhanKhusus,
+} from "@/lib/kebutuhan-khusus";
 
-type Distribusi = {
+// --- Tipe data dari server ---------------------------------------------------------
+
+type MenuItemData = {
+  id: string;
+  siklus: number;
+  namaMenu: string;
+  energi: number;
+  karbohidrat: number;
+  lemak: number;
+  proteinHewani: number;
+  proteinNabati: number;
+  pakaiPanganLokal: boolean;
+  panganLokalRincian: string | null;
+};
+
+type DistribusiData = {
   id: string;
   status: string;
   porsiDiterima: number | null;
+  porsiDiterimaUmum: number | null;
+  porsiDiterimaKhusus: number | null;
+  layakCount: number | null;
+  tidakLayakCount: number | null;
   catatan: string | null;
-  sekolah: { namaSekolah: string };
+  sekolah: { id: string; namaSekolah: string; jenjang: JenjangBgn };
 };
 
 type Menu = {
   id: string;
   tanggal: string;
-  deskripsi: string;
   fotoUrl: string | null;
   jumlahPorsi: number;
+  porsiUmum: number | null;
+  porsiKhusus: number | null;
+  untukWaktu: "pagi" | "siang" | null;
   nomorMenu: number | null;
+  items: MenuItemData[];
+  distribusi: DistribusiData[];
+  // Legacy (menu dari sebelum model item-per-item ada)
+  deskripsi: string | null;
   siklus: number | null;
   energiKategoriI: number | null;
   proteinKategoriI: number | null;
@@ -30,7 +70,15 @@ type Menu = {
   proteinKategoriII: number | null;
   lemakKategoriII: number | null;
   karbohidratKategoriII: number | null;
-  distribusi: Distribusi[];
+};
+
+type SekolahRingkas = {
+  id: string;
+  namaSekolah: string;
+  jenjang: JenjangBgn;
+  jumlahSiswa: number | null;
+  disabilitasData: DataKebutuhanKhusus | null;
+  alergiData: DataKebutuhanKhusus | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -39,162 +87,485 @@ const STATUS_LABEL: Record<string, string> = {
   bermasalah: "Bermasalah",
 };
 
-// Nilai gizi disimpan sbg string di form state (biar input kosong gampang dicek/dikirim),
-// baru di-parse jadi number di server (lihat src/lib/gizi.ts).
-type GiziForm = {
-  nomorMenu: string;
+const WAKTU_OPSI: SelectOption<"pagi" | "siang">[] = [
+  { value: "pagi", label: "Makan Pagi" },
+  { value: "siang", label: "Makan Siang" },
+];
+
+const TZ_OPSI = TZ_OPSI_BASE;
+
+// --- Form item menu (state lokal, semua nilai numerik disimpan sbg string) ---------
+
+type ItemForm = {
+  key: string;
   siklus: string;
-  energiKategoriI: string;
-  proteinKategoriI: string;
-  lemakKategoriI: string;
-  karbohidratKategoriI: string;
-  energiKategoriII: string;
-  proteinKategoriII: string;
-  lemakKategoriII: string;
-  karbohidratKategoriII: string;
+  namaMenu: string;
+  energi: string;
+  karbohidrat: string;
+  lemak: string;
+  proteinHewani: string;
+  proteinNabati: string;
+  pakaiPanganLokal: boolean;
+  panganLokalRincian: string;
 };
 
-const GIZI_KOSONG: GiziForm = {
-  nomorMenu: "",
-  siklus: "",
-  energiKategoriI: "",
-  proteinKategoriI: "",
-  lemakKategoriI: "",
-  karbohidratKategoriI: "",
-  energiKategoriII: "",
-  proteinKategoriII: "",
-  lemakKategoriII: "",
-  karbohidratKategoriII: "",
-};
+function buatKey() {
+  return Math.random().toString(36).slice(2);
+}
 
-function giziFromMenu(menu: Menu): GiziForm {
+function itemKosong(siklus = "1"): ItemForm {
   return {
-    nomorMenu: menu.nomorMenu != null ? String(menu.nomorMenu) : "",
-    siklus: menu.siklus != null ? String(menu.siklus) : "",
-    energiKategoriI: menu.energiKategoriI != null ? String(menu.energiKategoriI) : "",
-    proteinKategoriI: menu.proteinKategoriI != null ? String(menu.proteinKategoriI) : "",
-    lemakKategoriI: menu.lemakKategoriI != null ? String(menu.lemakKategoriI) : "",
-    karbohidratKategoriI: menu.karbohidratKategoriI != null ? String(menu.karbohidratKategoriI) : "",
-    energiKategoriII: menu.energiKategoriII != null ? String(menu.energiKategoriII) : "",
-    proteinKategoriII: menu.proteinKategoriII != null ? String(menu.proteinKategoriII) : "",
-    lemakKategoriII: menu.lemakKategoriII != null ? String(menu.lemakKategoriII) : "",
-    karbohidratKategoriII: menu.karbohidratKategoriII != null ? String(menu.karbohidratKategoriII) : "",
+    key: buatKey(),
+    siklus,
+    namaMenu: "",
+    energi: "",
+    karbohidrat: "",
+    lemak: "",
+    proteinHewani: "",
+    proteinNabati: "",
+    pakaiPanganLokal: false,
+    panganLokalRincian: "",
   };
 }
 
-function setGiziOnFormData(formData: FormData, gizi: GiziForm) {
-  (Object.keys(gizi) as (keyof GiziForm)[]).forEach((key) => formData.set(key, gizi[key]));
+function itemFormDariData(items: MenuItemData[]): ItemForm[] {
+  if (items.length === 0) return [itemKosong()];
+  return items.map((it) => ({
+    key: buatKey(),
+    siklus: String(it.siklus),
+    namaMenu: it.namaMenu,
+    energi: String(it.energi),
+    karbohidrat: String(it.karbohidrat),
+    lemak: String(it.lemak),
+    proteinHewani: String(it.proteinHewani),
+    proteinNabati: String(it.proteinNabati),
+    pakaiPanganLokal: it.pakaiPanganLokal,
+    panganLokalRincian: it.panganLokalRincian ?? "",
+  }));
 }
 
-// Kontrol upload foto yang lebih jelas keliatan bisa diklik (feedback Teh Lingga: "Choose
-// File" bawaan browser kurang distinct) -- input aslinya disembunyikan, label yang jadi
-// kontrol visualnya, dikasih ikon + nama file yang lagi dipilih.
-function FotoInput({
-  file,
-  onChange,
-  placeholder,
-}: {
-  file: File | null;
-  onChange: (f: File | null) => void;
-  placeholder: string;
-}) {
-  return (
-    <label className="cursor-pointer flex items-center gap-2 rounded-md border border-dashed border-neutral-300 px-3 py-2.5 text-sm text-neutral-600 hover:bg-neutral-50 hover:border-neutral-400 transition-colors">
-      <PhotoIcon className="size-5 text-neutral-400 flex-shrink-0" />
-      <span className="truncate">{file ? file.name : placeholder}</span>
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-        className="hidden"
-      />
-    </label>
+
+// --- Form value gabungan (dipakai buat form upload baru MAUPUN edit riwayat) -------
+
+type MenuFormValue = {
+  sekolahId: string;
+  untukWaktu: "pagi" | "siang" | "";
+  porsiUmum: string;
+  porsiKhusus: string;
+  nomorMenu: string;
+  tanggal: string;
+  jam: string;
+  tz: Tz;
+  foto: File | null;
+  items: ItemForm[];
+};
+
+function nilaiFormKosong(sekolahDefault = ""): MenuFormValue {
+  const { tanggal, jam } = tanggalJamSekarang(TZ_TIMEZONE.WIB);
+  return {
+    sekolahId: sekolahDefault,
+    untukWaktu: "",
+    porsiUmum: "",
+    porsiKhusus: "",
+    nomorMenu: "",
+    tanggal,
+    jam,
+    tz: "WIB",
+    foto: null,
+    items: [itemKosong()],
+  };
+}
+
+function nilaiFormDariMenu(menu: Menu): MenuFormValue {
+  const d = menu.distribusi[0];
+  const { tanggal, jam } = isoKeTanggalJam(menu.tanggal, TZ_TIMEZONE.WIB);
+  return {
+    sekolahId: d?.sekolah.id ?? "",
+    untukWaktu: menu.untukWaktu ?? "",
+    porsiUmum: menu.porsiUmum != null ? String(menu.porsiUmum) : "",
+    porsiKhusus: menu.porsiKhusus != null ? String(menu.porsiKhusus) : "",
+    nomorMenu: menu.nomorMenu != null ? String(menu.nomorMenu) : "",
+    tanggal,
+    jam,
+    tz: "WIB",
+    foto: null,
+    items: itemFormDariData(menu.items),
+  };
+}
+
+function buildFormData(v: MenuFormValue): FormData {
+  const fd = new FormData();
+  fd.set("sekolahId", v.sekolahId);
+  fd.set("untukWaktu", v.untukWaktu);
+  fd.set("porsiUmum", v.porsiUmum);
+  fd.set("porsiKhusus", v.porsiKhusus);
+  fd.set("nomorMenu", v.nomorMenu);
+  fd.set("waktuKirim", tanggalJamTzKeIso(v.tanggal, v.jam, v.tz));
+  if (v.foto) fd.set("foto", v.foto);
+  fd.set(
+    "items",
+    JSON.stringify(
+      v.items.map((it) => ({
+        siklus: Number(it.siklus),
+        namaMenu: it.namaMenu.trim(),
+        energi: Number(it.energi),
+        karbohidrat: Number(it.karbohidrat),
+        lemak: Number(it.lemak),
+        proteinHewani: Number(it.proteinHewani),
+        proteinNabati: Number(it.proteinNabati),
+        pakaiPanganLokal: it.pakaiPanganLokal,
+        panganLokalRincian: it.panganLokalRincian.trim() || null,
+      }))
+    )
   );
+  return fd;
 }
 
-function GiziFields({
-  value,
+// Highlight border/bg field nutrisi yg relevan sama nama menu yg lagi diketik/dipilih
+// (kesepakatan tim: mis. "susu" nge-highlight Protein Hewani + Lemak sekaligus).
+function kelasHighlight(kategori: KategoriNutrisi, aktif: KategoriNutrisi[]) {
+  return aktif.includes(kategori)
+    ? "border-amber-400 bg-amber-50 ring-1 ring-amber-300"
+    : "border-neutral-300";
+}
+
+// --- Ringkasan nilai gizi per siklus + evaluasi BGN (SMA aja utk sekarang) ---------
+
+// --- Editor baris item menu ---------------------------------------------------------
+
+function ItemEditor({
+  items,
   onChange,
 }: {
-  value: GiziForm;
-  onChange: (next: GiziForm) => void;
+  items: ItemForm[];
+  onChange: (items: ItemForm[]) => void;
 }) {
-  function field(key: keyof GiziForm) {
-    return (
-      <input
-        required
-        type="number"
-        step="any"
-        min={0}
-        value={value[key]}
-        onChange={(e) => onChange({ ...value, [key]: e.target.value })}
-        className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-      />
-    );
+  function update(key: string, patch: Partial<ItemForm>) {
+    onChange(items.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+  }
+  function remove(key: string) {
+    if (items.length <= 1) return;
+    onChange(items.filter((it) => it.key !== key));
+  }
+  function tambah() {
+    const siklusTerakhir = items[items.length - 1]?.siklus || "1";
+    onChange([...items, itemKosong(siklusTerakhir)]);
   }
 
+  const namaOpsi = OPSI_MENU_ITEM.map((o) => o.nama);
+
   return (
-    <div className="space-y-3 border border-neutral-200 rounded-md p-3">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-neutral-600">Nomor menu</label>
-          {field("nomorMenu")}
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-neutral-600">Siklus</label>
-          {field("siklus")}
-        </div>
-      </div>
+    <div className="space-y-3">
+      {items.map((item, idx) => {
+        const highlight = highlightUntukNama(item.namaMenu);
+        return (
+          <div key={item.key} className="rounded-md border border-neutral-200 p-3 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-neutral-500">Item #{idx + 1}</span>
+              {items.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => remove(item.key)}
+                  className="cursor-pointer text-neutral-400 hover:text-red-600"
+                  aria-label="Hapus item"
+                >
+                  <TrashIcon className="size-4" />
+                </button>
+              )}
+            </div>
 
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-neutral-600">Nilai Gizi – Kategori I (SD)</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-500">Energi (kkal)</label>
-            {field("energiKategoriI")}
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-500">Protein (g)</label>
-            {field("proteinKategoriI")}
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-500">Lemak (g)</label>
-            {field("lemakKategoriI")}
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-500">Karbohidrat (g)</label>
-            {field("karbohidratKategoriI")}
-          </div>
-        </div>
-      </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <label className="text-xs text-neutral-500">Siklus</label>
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  value={item.siklus}
+                  onChange={(e) => update(item.key, { siklus: e.target.value })}
+                  className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-neutral-500">Nama menu</label>
+                <CreatableCombobox
+                  value={item.namaMenu}
+                  onChange={(v) => update(item.key, { namaMenu: v })}
+                  options={namaOpsi}
+                  placeholder="Ketik atau pilih nama menu..."
+                />
+              </div>
+            </div>
 
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-neutral-600">Nilai Gizi – Kategori II (SMP ke atas)</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-500">Energi (kkal)</label>
-            {field("energiKategoriII")}
+            <div className="grid grid-cols-2 gap-2.5">
+              {(
+                [
+                  ["energi", "Energi (kkal)"],
+                  ["karbohidrat", "Karbohidrat (g)"],
+                  ["lemak", "Lemak (g)"],
+                  ["proteinHewani", "Protein Hewani (g)"],
+                  ["proteinNabati", "Protein Nabati (g)"],
+                ] as [KategoriNutrisi, string][]
+              ).map(([key, label]) => (
+                <div key={key} className="space-y-1">
+                  <label className="text-xs text-neutral-500">{label}</label>
+                  <input
+                    required
+                    type="number"
+                    step="any"
+                    min={0}
+                    value={item[key]}
+                    onChange={(e) => update(item.key, { [key]: e.target.value } as Partial<ItemForm>)}
+                    className={`w-full rounded-md border px-3 py-2 text-sm transition-colors ${kelasHighlight(key, highlight)}`}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <LabeledCheckbox
+              checked={item.pakaiPanganLokal}
+              onChange={(v) => update(item.key, { pakaiPanganLokal: v })}
+              label="Pakai pangan lokal"
+            />
+            {item.pakaiPanganLokal && (
+              <input
+                type="text"
+                value={item.panganLokalRincian}
+                onChange={(e) => update(item.key, { panganLokalRincian: e.target.value })}
+                placeholder="Rincian pangan lokal (mis. beras dari petani setempat)"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              />
+            )}
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-500">Protein (g)</label>
-            {field("proteinKategoriII")}
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-500">Lemak (g)</label>
-            {field("lemakKategoriII")}
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-neutral-500">Karbohidrat (g)</label>
-            {field("karbohidratKategoriII")}
-          </div>
-        </div>
-      </div>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={tambah}
+        className="cursor-pointer w-full flex items-center justify-center gap-1.5 rounded-md border border-dashed border-neutral-300 py-2 text-sm text-neutral-600 hover:bg-neutral-50 hover:border-neutral-400"
+      >
+        <PlusIcon className="size-4" /> Tambah item menu
+      </button>
     </div>
   );
 }
 
-// Blok nilai gizi read-only, dipakai di rincian riwayat distribusi (bukan form edit).
-function GiziBlock({
+// --- Form lengkap (dipakai utk upload baru & edit riwayat) --------------------------
+
+function MenuFormFields({
+  value,
+  onChange,
+  sekolahList,
+}: {
+  value: MenuFormValue;
+  onChange: (v: MenuFormValue) => void;
+  sekolahList: SekolahRingkas[];
+}) {
+  const sekolahOpsi: SelectOption[] = sekolahList.map((s) => ({
+    value: s.id,
+    label: s.namaSekolah,
+    description: `Jenjang ${s.jenjang}`,
+  }));
+  const sekolahTerpilih = sekolahList.find((s) => s.id === value.sekolahId) ?? null;
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Sekolah tujuan</label>
+        <p className="text-xs text-neutral-500">
+          Satu menu cuma bisa ditujukan ke satu sekolah. Daftar di bawah = sekolah yang dilayani SPPG ini.
+        </p>
+        <Select
+          value={value.sekolahId || null}
+          onChange={(v) => onChange({ ...value, sekolahId: v })}
+          options={sekolahOpsi}
+          placeholder={sekolahList.length ? "Pilih sekolah..." : "Belum ada sekolah terhubung"}
+          disabled={sekolahList.length === 0}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Untuk waktu makan</label>
+        <Select
+          value={value.untukWaktu || null}
+          onChange={(v) => onChange({ ...value, untukWaktu: v })}
+          options={WAKTU_OPSI}
+          placeholder="Pilih Pagi/Siang..."
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Nomor menu</label>
+        <input
+          required
+          type="number"
+          min={1}
+          value={value.nomorMenu}
+          onChange={(e) => onChange({ ...value, nomorMenu: e.target.value })}
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <div>
+          <label className="text-sm font-medium">Porsi umum &amp; porsi khusus</label>
+          <Expandable summary="Apa bedanya porsi umum & khusus?">
+            <p className="text-xs text-neutral-500">
+              <strong>Porsi umum</strong> = porsi standar utk siswa pada umumnya. <strong>Porsi khusus</strong> =
+              porsi yang disesuaikan utk siswa dengan kebutuhan khusus (mis. disabilitas, alergi/pantangan
+              tertentu) yang datanya diisi sekolah. Total keduanya = jumlah porsi yang dikirim.
+            </p>
+          </Expandable>
+        </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Porsi umum</label>
+            <input
+              required
+              type="number"
+              min={0}
+              value={value.porsiUmum}
+              onChange={(e) => onChange({ ...value, porsiUmum: e.target.value })}
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-neutral-500">Porsi khusus</label>
+            <input
+              required
+              type="number"
+              min={0}
+              value={value.porsiKhusus}
+              onChange={(e) => onChange({ ...value, porsiKhusus: e.target.value })}
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Waktu kirim</label>
+        <div className="grid grid-cols-2 gap-2.5">
+          <input
+            required
+            type="date"
+            value={value.tanggal}
+            onChange={(e) => onChange({ ...value, tanggal: e.target.value })}
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          />
+          <input
+            required
+            type="time"
+            value={value.jam}
+            onChange={(e) => onChange({ ...value, jam: e.target.value })}
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          />
+        </div>
+        <SegmentedRadioGroup
+          value={value.tz}
+          onChange={(v) => onChange({ ...value, tz: v })}
+          options={TZ_OPSI as unknown as { value: Tz; label: string }[]}
+          className="mt-1.5"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Foto masakan (opsional)</label>
+        <FileInput file={value.foto} onChange={(f) => onChange({ ...value, foto: f })} placeholder="Pilih foto masakan..." />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Item menu</label>
+        <p className="text-xs text-neutral-500">
+          Tiap item boleh siklus beda-beda -- ringkasan gizi & evaluasi BGN dihitung per siklus.
+        </p>
+        <ItemEditor items={value.items} onChange={(items) => onChange({ ...value, items })} />
+      </div>
+
+      <RingkasanGiziSiklus
+        items={value.items}
+        jenjang={sekolahTerpilih?.jenjang ?? null}
+        untukWaktu={value.untukWaktu}
+      />
+    </div>
+  );
+}
+
+// --- Panel ringkasan disabilitas & alergi (agregat semua sekolah SPPG ini) ---------
+
+function agregatKebutuhanKhusus(sekolahList: SekolahRingkas[], field: "disabilitasData" | "alergiData") {
+  const total: Record<string, number> = {};
+  for (const s of sekolahList) {
+    const data = s[field];
+    if (!data) continue;
+    for (const [kode, entri] of Object.entries(data)) {
+      total[kode] = (total[kode] ?? 0) + (entri?.jumlah ?? 0);
+    }
+  }
+  return total;
+}
+
+function PanelKebutuhanKhusus({ sekolahList }: { sekolahList: SekolahRingkas[] }) {
+  const disabilitas = agregatKebutuhanKhusus(sekolahList, "disabilitasData");
+  const alergi = agregatKebutuhanKhusus(sekolahList, "alergiData");
+  const adaDisabilitas = Object.values(disabilitas).some((v) => v > 0);
+  const adaAlergi = Object.values(alergi).some((v) => v > 0);
+
+  if (sekolahList.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-neutral-200 p-4 lg:sticky lg:top-6 space-y-4">
+      <div>
+        <h2 className="font-medium text-sm">Ringkasan Kebutuhan Khusus</h2>
+        <p className="text-xs text-neutral-500 mt-0.5">Gabungan data dari semua sekolah yang dilayani.</p>
+      </div>
+
+      <div>
+        <p className="text-xs font-medium text-neutral-600 mb-1.5">Disabilitas</p>
+        {!adaDisabilitas && <p className="text-xs text-neutral-400">Belum ada data.</p>}
+        <div className="space-y-1">
+          {KATEGORI_DISABILITAS.filter((k) => (disabilitas[k.kode] ?? 0) > 0).map((k) => (
+            <div key={k.kode} className="flex items-center justify-between text-xs">
+              <span className="text-neutral-600">
+                {k.kode} &middot; {k.label}
+              </span>
+              <span className="font-medium text-neutral-900">{disabilitas[k.kode]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-medium text-neutral-600 mb-1.5">Alergi / pantangan</p>
+        {!adaAlergi && <p className="text-xs text-neutral-400">Belum ada data.</p>}
+        <div className="space-y-1">
+          {KATEGORI_ALERGI.filter((k) => (alergi[k.kode] ?? 0) > 0).map((k) => (
+            <div key={k.kode} className="flex items-center justify-between text-xs">
+              <span className="text-neutral-600">{k.label}</span>
+              <span className="font-medium text-neutral-900">{alergi[k.kode]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Expandable summary="Rincian per sekolah">
+        <div className="space-y-2">
+          {sekolahList.map((s) => (
+            <div key={s.id} className="text-xs border border-neutral-100 rounded-md p-2">
+              <p className="font-medium text-neutral-800">{s.namaSekolah}</p>
+              <p className="text-neutral-500">Jenjang {s.jenjang}</p>
+            </div>
+          ))}
+        </div>
+      </Expandable>
+    </div>
+  );
+}
+
+// --- Rincian riwayat (menu item + evaluasi BGN + per sekolah) ----------------------
+
+function GiziBlockLegacy({
   label,
   energi,
   protein,
@@ -220,26 +591,128 @@ function GiziBlock({
   );
 }
 
-type EditState = { deskripsi: string; jumlahPorsi: string; foto: File | null; gizi: GiziForm };
+function RincianMenu({ menu }: { menu: Menu }) {
+  const punyaItems = menu.items.length > 0;
+  const sekolahJenjang = menu.distribusi[0]?.sekolah.jenjang ?? null;
+
+  const adaGiziLegacyI =
+    menu.energiKategoriI != null && menu.proteinKategoriI != null && menu.lemakKategoriI != null && menu.karbohidratKategoriI != null;
+  const adaGiziLegacyII =
+    menu.energiKategoriII != null && menu.proteinKategoriII != null && menu.lemakKategoriII != null && menu.karbohidratKategoriII != null;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-neutral-200 space-y-3">
+      {menu.fotoUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={menu.fotoUrl}
+          alt={`Foto menu ${menu.nomorMenu ?? ""}`}
+          className="w-full max-h-80 object-contain rounded-md border border-neutral-200 bg-neutral-50"
+        />
+      )}
+
+      {punyaItems ? (
+        <>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-neutral-700">Daftar item</p>
+            <div className="space-y-1.5">
+              {menu.items.map((it) => (
+                <div key={it.id} className="text-xs border border-neutral-100 rounded-md p-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-neutral-800">{it.namaMenu}</span>
+                    <span className="text-neutral-400">Siklus {it.siklus}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-neutral-500 mt-1">
+                    <span>Energi: {formatAngkaID(it.energi)} kkal</span>
+                    <span>Karbohidrat: {formatAngkaID(it.karbohidrat)} g</span>
+                    <span>Lemak: {formatAngkaID(it.lemak)} g</span>
+                    <span>
+                      Protein: {formatAngkaID(it.proteinHewani + it.proteinNabati)} g (hewani{" "}
+                      {formatAngkaID(it.proteinHewani)} / nabati {formatAngkaID(it.proteinNabati)})
+                    </span>
+                  </div>
+                  {it.pakaiPanganLokal && (
+                    <p className="text-green-700 mt-1">
+                      Pangan lokal{it.panganLokalRincian ? `: ${it.panganLokalRincian}` : ""}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <RingkasanGiziSiklus items={menu.items} jenjang={sekolahJenjang} untukWaktu={menu.untukWaktu ?? ""} />
+        </>
+      ) : (
+        (adaGiziLegacyI || adaGiziLegacyII) && (
+          <div className="space-y-2">
+            <p className="text-xs text-neutral-400 italic">Menu lama (sebelum model item-per-item)</p>
+            {adaGiziLegacyI && (
+              <GiziBlockLegacy
+                label="Nilai Gizi – Kategori I (SD)"
+                energi={menu.energiKategoriI!}
+                protein={menu.proteinKategoriI!}
+                lemak={menu.lemakKategoriI!}
+                karbohidrat={menu.karbohidratKategoriI!}
+              />
+            )}
+            {adaGiziLegacyII && (
+              <GiziBlockLegacy
+                label="Nilai Gizi – Kategori II (SMP ke atas)"
+                energi={menu.energiKategoriII!}
+                protein={menu.proteinKategoriII!}
+                lemak={menu.lemakKategoriII!}
+                karbohidrat={menu.karbohidratKategoriII!}
+              />
+            )}
+          </div>
+        )
+      )}
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-neutral-700">Detail per sekolah</p>
+        {menu.distribusi.map((d) => (
+          <div key={d.id} className="text-xs text-neutral-600 border border-neutral-100 rounded-md p-2">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-neutral-800">{d.sekolah.namaSekolah}</span>
+              <span>{STATUS_LABEL[d.status] ?? d.status}</span>
+            </div>
+            {(d.porsiDiterimaUmum != null || d.porsiDiterimaKhusus != null) && (
+              <div className="mt-0.5">
+                Porsi diterima: {d.porsiDiterimaUmum ?? 0} umum + {d.porsiDiterimaKhusus ?? 0} khusus
+              </div>
+            )}
+            {d.porsiDiterima != null && d.porsiDiterimaUmum == null && (
+              <div className="mt-0.5">
+                Porsi diterima: {d.porsiDiterima}/{menu.jumlahPorsi}
+              </div>
+            )}
+            {(d.layakCount != null || d.tidakLayakCount != null) && (
+              <div className="mt-0.5">
+                Hasil pemeriksaan: {d.layakCount ?? 0} layak, {d.tidakLayakCount ?? 0} tidak layak
+              </div>
+            )}
+            {d.catatan && <div className="mt-0.5 text-red-600">Catatan: {d.catatan}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// --- Komponen utama ------------------------------------------------------------------
 
 export function SppgDashboard() {
   const [menuList, setMenuList] = useState<Menu[]>([]);
+  const [sekolahList, setSekolahList] = useState<SekolahRingkas[]>([]);
   const [rating, setRating] = useState<{ rataRata: number | null; jumlah: number } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [deskripsi, setDeskripsi] = useState("");
-  const [jumlahPorsi, setJumlahPorsi] = useState("");
-  const [foto, setFoto] = useState<File | null>(null);
-  const [gizi, setGizi] = useState<GiziForm>(GIZI_KOSONG);
+
+  const [formValue, setFormValue] = useState<MenuFormValue>(() => nilaiFormKosong());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>({
-    deskripsi: "",
-    jumlahPorsi: "",
-    foto: null,
-    gizi: GIZI_KOSONG,
-  });
+  const [editValue, setEditValue] = useState<MenuFormValue | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
@@ -262,6 +735,9 @@ export function SppgDashboard() {
     fetch("/api/sppg/rating")
       .then((r) => r.json())
       .then((d) => setRating({ rataRata: d.rataRata ?? null, jumlah: d.jumlah ?? 0 }));
+    fetch("/api/sppg/sekolah")
+      .then((r) => r.json())
+      .then((d) => setSekolahList(d.sekolahList ?? []));
   }, []);
 
   async function handleSubmit(e: FormEvent) {
@@ -269,13 +745,7 @@ export function SppgDashboard() {
     setError(null);
     setSubmitting(true);
 
-    const formData = new FormData();
-    formData.set("deskripsi", deskripsi);
-    formData.set("jumlahPorsi", jumlahPorsi);
-    if (foto) formData.set("foto", foto);
-    setGiziOnFormData(formData, gizi);
-
-    const res = await fetch("/api/sppg/menu", { method: "POST", body: formData });
+    const res = await fetch("/api/sppg/menu", { method: "POST", body: buildFormData(formValue) });
     const data = await res.json();
 
     if (!res.ok) {
@@ -285,34 +755,22 @@ export function SppgDashboard() {
     }
 
     setMenuList((prev) => [data.menu, ...prev]);
-    setDeskripsi("");
-    setJumlahPorsi("");
-    setFoto(null);
-    setGizi(GIZI_KOSONG);
+    setFormValue(nilaiFormKosong(formValue.sekolahId));
     setSubmitting(false);
   }
 
   function startEdit(menu: Menu) {
     setEditingId(menu.id);
-    setEditState({
-      deskripsi: menu.deskripsi,
-      jumlahPorsi: String(menu.jumlahPorsi),
-      foto: null,
-      gizi: giziFromMenu(menu),
-    });
+    setEditValue(nilaiFormDariMenu(menu));
     setRowError(null);
   }
 
   async function saveEdit(menuId: string) {
+    if (!editValue) return;
     setRowBusy(menuId);
     setRowError(null);
-    const formData = new FormData();
-    formData.set("deskripsi", editState.deskripsi);
-    formData.set("jumlahPorsi", editState.jumlahPorsi);
-    if (editState.foto) formData.set("foto", editState.foto);
-    setGiziOnFormData(formData, editState.gizi);
 
-    const res = await fetch(`/api/sppg/menu/${menuId}`, { method: "PATCH", body: formData });
+    const res = await fetch(`/api/sppg/menu/${menuId}`, { method: "PATCH", body: buildFormData(editValue) });
     const data = await res.json();
 
     if (!res.ok) {
@@ -323,6 +781,7 @@ export function SppgDashboard() {
 
     setMenuList((prev) => prev.map((m) => (m.id === menuId ? data.menu : m)));
     setEditingId(null);
+    setEditValue(null);
     setRowBusy(null);
   }
 
@@ -343,11 +802,13 @@ export function SppgDashboard() {
     setRowBusy(null);
   }
 
+  const punyaSekolah = sekolahList.length > 0;
+
   return (
     <DashboardShell title="Portal SPPG" subtitle="Unggah menu harian & distribusi ke sekolah">
-      <main className="max-w-lg mx-auto p-6 space-y-8">
+      <main className="max-w-5xl mx-auto p-6">
         {rating && rating.jumlah > 0 && (
-          <div className="border border-neutral-200 rounded-lg p-4 text-sm flex items-center justify-between">
+          <div className="border border-neutral-200 rounded-lg p-4 text-sm flex items-center justify-between mb-6">
             <span className="text-neutral-600">Rating dari Sekolah &amp; Orangtua</span>
             <span className="font-semibold">
               ⭐ {rating.rataRata?.toFixed(1)}{" "}
@@ -355,275 +816,160 @@ export function SppgDashboard() {
             </span>
           </div>
         )}
-        <form onSubmit={handleSubmit} className="space-y-4 border border-neutral-200 rounded-lg p-5">
-          <h2 className="font-medium text-sm">Unggah Menu Hari Ini</h2>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Deskripsi menu</label>
-            <textarea
-              required
-              value={deskripsi}
-              onChange={(e) => setDeskripsi(e.target.value)}
-              placeholder="Nasi, Ayam Bakar Bumbu Kecap, Tumis Kangkung, Pisang"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm min-h-20"
-            />
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
+          <div className="space-y-8 min-w-0">
+            <form onSubmit={handleSubmit} className="space-y-4 border border-neutral-200 rounded-lg p-5">
+              <h2 className="font-medium text-sm">Unggah Menu</h2>
+              {!punyaSekolah && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+                  Belum ada sekolah yang terhubung ke SPPG ini.
+                </p>
+              )}
+              <MenuFormFields value={formValue} onChange={setFormValue} sekolahList={sekolahList} />
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Jumlah porsi</label>
-            <input
-              required
-              type="number"
-              min={1}
-              value={jumlahPorsi}
-              onChange={(e) => setJumlahPorsi(e.target.value)}
-              placeholder="300"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-            />
-          </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Nomor menu, siklus & nilai gizi</label>
-            <p className="text-xs text-neutral-500">
-              Wajib diisi -- ikut ditampilkan di pesan WA ke sekolah (permintaan tim Prof Elly).
-            </p>
-            <GiziFields value={gizi} onChange={setGizi} />
-          </div>
+              <button
+                type="submit"
+                disabled={submitting || !punyaSekolah}
+                className="cursor-pointer w-full rounded-md bg-neutral-900 text-white text-sm font-medium py-2.5 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {submitting ? "Mengirim..." : "Kirim ke Sekolah"}
+              </button>
+            </form>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Foto masakan (opsional)</label>
-            <FotoInput file={foto} onChange={setFoto} placeholder="Pilih foto masakan..." />
-          </div>
+            <div>
+              <h2 className="font-medium text-sm mb-3">Riwayat Distribusi</h2>
+              {loading && <p className="text-sm text-neutral-500">Memuat...</p>}
+              {!loading && menuList.length === 0 && (
+                <p className="text-sm text-neutral-500">Belum ada menu yang diunggah.</p>
+              )}
+              <div className="space-y-3">
+                {menuList.map((menu) => {
+                  const canEdit = menu.distribusi.every((d) => d.status === "dikirim");
+                  const isEditing = editingId === menu.id;
+                  const busy = rowBusy === menu.id;
+                  const expanded = expandedIds.has(menu.id);
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+                  return (
+                    <div key={menu.id} className="border border-neutral-200 rounded-lg p-4 text-sm">
+                      {!isEditing && (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">
+                              {new Date(menu.tanggal).toLocaleDateString("id-ID", {
+                                weekday: "long",
+                                day: "numeric",
+                                month: "long",
+                              })}
+                            </span>
+                            <span className="text-neutral-500">{menu.jumlahPorsi} porsi</span>
+                          </div>
+                          <p className="text-xs text-neutral-500 mt-0.5">
+                            {menu.nomorMenu != null && `Menu ${menu.nomorMenu}`}
+                            {menu.untukWaktu && ` · ${menu.untukWaktu === "pagi" ? "Makan Pagi" : "Makan Siang"}`}
+                          </p>
+                          {menu.deskripsi && <p className="text-neutral-600 mt-1">{menu.deskripsi}</p>}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {menu.distribusi.map((d) => (
+                              <span key={d.id} className="text-xs rounded-full px-2.5 py-1 bg-neutral-100 text-neutral-700">
+                                {d.sekolah.namaSekolah}: {STATUS_LABEL[d.status] ?? d.status}
+                              </span>
+                            ))}
+                          </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-md bg-neutral-900 text-white text-sm font-medium py-2.5 disabled:opacity-60"
-          >
-            {submitting ? "Mengirim..." : "Kirim ke Sekolah"}
-          </button>
-        </form>
-
-        <div>
-          <h2 className="font-medium text-sm mb-3">Riwayat Distribusi</h2>
-          {loading && <p className="text-sm text-neutral-500">Memuat...</p>}
-          {!loading && menuList.length === 0 && (
-            <p className="text-sm text-neutral-500">Belum ada menu yang diunggah.</p>
-          )}
-          <div className="space-y-3">
-            {menuList.map((menu) => {
-              const canEdit = menu.distribusi.every((d) => d.status === "dikirim");
-              const isEditing = editingId === menu.id;
-              const busy = rowBusy === menu.id;
-              const expanded = expandedIds.has(menu.id);
-              const adaGiziI =
-                menu.energiKategoriI != null &&
-                menu.proteinKategoriI != null &&
-                menu.lemakKategoriI != null &&
-                menu.karbohidratKategoriI != null;
-              const adaGiziII =
-                menu.energiKategoriII != null &&
-                menu.proteinKategoriII != null &&
-                menu.lemakKategoriII != null &&
-                menu.karbohidratKategoriII != null;
-
-              return (
-                <div key={menu.id} className="border border-neutral-200 rounded-lg p-4 text-sm">
-                  {!isEditing && (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">
-                          {new Date(menu.tanggal).toLocaleDateString("id-ID", {
-                            weekday: "long",
-                            day: "numeric",
-                            month: "long",
-                          })}
-                        </span>
-                        <span className="text-neutral-500">{menu.jumlahPorsi} porsi</span>
-                      </div>
-                      {menu.nomorMenu != null && menu.siklus != null && (
-                        <p className="text-xs text-neutral-500 mt-0.5">
-                          Menu {menu.nomorMenu} Siklus {menu.siklus}
-                        </p>
-                      )}
-                      <p className="text-neutral-600 mt-1">{menu.deskripsi}</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {menu.distribusi.map((d) => (
-                          <span
-                            key={d.id}
-                            className="text-xs rounded-full px-2.5 py-1 bg-neutral-100 text-neutral-700"
+                          <button
+                            onClick={() => toggleExpand(menu.id)}
+                            className="cursor-pointer mt-3 flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800"
                           >
-                            {d.sekolah.namaSekolah}: {STATUS_LABEL[d.status] ?? d.status}
-                          </span>
-                        ))}
-                      </div>
+                            {expanded ? (
+                              <>
+                                <ChevronUpIcon className="size-3.5" /> Sembunyikan rincian
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDownIcon className="size-3.5" /> Lihat rincian
+                              </>
+                            )}
+                          </button>
 
-                      <button
-                        onClick={() => toggleExpand(menu.id)}
-                        className="cursor-pointer mt-3 flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800"
-                      >
-                        {expanded ? (
-                          <>
-                            <ChevronUpIcon className="size-3.5" /> Sembunyikan rincian
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDownIcon className="size-3.5" /> Lihat rincian
-                          </>
-                        )}
-                      </button>
+                          {expanded && <RincianMenu menu={menu} />}
 
-                      {expanded && (
-                        <div className="mt-3 pt-3 border-t border-neutral-200 space-y-3">
-                          {menu.fotoUrl && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={menu.fotoUrl}
-                              alt={`Foto menu: ${menu.deskripsi}`}
-                              className="w-full max-h-80 object-contain rounded-md border border-neutral-200 bg-neutral-50"
-                            />
-                          )}
-                          {(adaGiziI || adaGiziII) && (
-                            <div className="space-y-2">
-                              {adaGiziI && (
-                                <GiziBlock
-                                  label="Nilai Gizi – Kategori I (SD)"
-                                  energi={menu.energiKategoriI!}
-                                  protein={menu.proteinKategoriI!}
-                                  lemak={menu.lemakKategoriI!}
-                                  karbohidrat={menu.karbohidratKategoriI!}
-                                />
-                              )}
-                              {adaGiziII && (
-                                <GiziBlock
-                                  label="Nilai Gizi – Kategori II (SMP ke atas)"
-                                  energi={menu.energiKategoriII!}
-                                  protein={menu.proteinKategoriII!}
-                                  lemak={menu.lemakKategoriII!}
-                                  karbohidrat={menu.karbohidratKategoriII!}
-                                />
+                          {canEdit && (
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={() => startEdit(menu)}
+                                className="cursor-pointer text-xs rounded-md border border-neutral-300 px-3 py-1.5"
+                              >
+                                Edit
+                              </button>
+                              {confirmDeleteId === menu.id ? (
+                                <>
+                                  <span className="text-xs text-neutral-500 self-center">Yakin hapus?</span>
+                                  <button
+                                    disabled={busy}
+                                    onClick={() => deleteMenu(menu.id)}
+                                    className="cursor-pointer text-xs rounded-md bg-red-600 text-white px-3 py-1.5 disabled:opacity-60"
+                                  >
+                                    Ya, hapus
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDeleteId(null)}
+                                    className="cursor-pointer text-xs rounded-md border border-neutral-300 px-3 py-1.5"
+                                  >
+                                    Batal
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => setConfirmDeleteId(menu.id)}
+                                  className="cursor-pointer text-xs rounded-md border border-neutral-300 px-3 py-1.5 text-red-600"
+                                >
+                                  Hapus
+                                </button>
                               )}
                             </div>
                           )}
-                          <div className="space-y-2">
-                            <p className="text-xs font-medium text-neutral-700">Detail per sekolah</p>
-                            {menu.distribusi.map((d) => (
-                              <div key={d.id} className="text-xs text-neutral-600 border border-neutral-100 rounded-md p-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium text-neutral-800">{d.sekolah.namaSekolah}</span>
-                                  <span>{STATUS_LABEL[d.status] ?? d.status}</span>
-                                </div>
-                                {d.porsiDiterima != null && (
-                                  <div className="mt-0.5">
-                                    Porsi diterima: {d.porsiDiterima}/{menu.jumlahPorsi}
-                                  </div>
-                                )}
-                                {d.catatan && <div className="mt-0.5 text-red-600">Catatan: {d.catatan}</div>}
-                              </div>
-                            ))}
+                          {rowError && confirmDeleteId === menu.id && <p className="text-xs text-red-600 mt-2">{rowError}</p>}
+                        </>
+                      )}
+
+                      {isEditing && editValue && (
+                        <div className="space-y-3">
+                          <MenuFormFields value={editValue} onChange={setEditValue} sekolahList={sekolahList} />
+                          {rowError && <p className="text-xs text-red-600">{rowError}</p>}
+                          <div className="flex gap-2">
+                            <button
+                              disabled={busy}
+                              onClick={() => saveEdit(menu.id)}
+                              className="cursor-pointer flex-1 rounded-md bg-neutral-900 text-white text-sm py-2 disabled:opacity-60"
+                            >
+                              {busy ? "Menyimpan..." : "Simpan"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingId(null);
+                                setEditValue(null);
+                              }}
+                              className="cursor-pointer flex-1 rounded-md border border-neutral-300 text-sm py-2"
+                            >
+                              Batal
+                            </button>
                           </div>
                         </div>
                       )}
-
-                      {canEdit && (
-                        <div className="flex gap-2 mt-3">
-                          <button
-                            onClick={() => startEdit(menu)}
-                            className="text-xs rounded-md border border-neutral-300 px-3 py-1.5"
-                          >
-                            Edit
-                          </button>
-                          {confirmDeleteId === menu.id ? (
-                            <>
-                              <span className="text-xs text-neutral-500 self-center">Yakin hapus?</span>
-                              <button
-                                disabled={busy}
-                                onClick={() => deleteMenu(menu.id)}
-                                className="text-xs rounded-md bg-red-600 text-white px-3 py-1.5 disabled:opacity-60"
-                              >
-                                Ya, hapus
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="text-xs rounded-md border border-neutral-300 px-3 py-1.5"
-                              >
-                                Batal
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmDeleteId(menu.id)}
-                              className="text-xs rounded-md border border-neutral-300 px-3 py-1.5 text-red-600"
-                            >
-                              Hapus
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      {rowError && confirmDeleteId === menu.id && (
-                        <p className="text-xs text-red-600 mt-2">{rowError}</p>
-                      )}
-                    </>
-                  )}
-
-                  {isEditing && (
-                    <div className="space-y-3">
-                      <textarea
-                        value={editState.deskripsi}
-                        onChange={(e) => setEditState((s) => ({ ...s, deskripsi: e.target.value }))}
-                        className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm min-h-16"
-                      />
-                      <input
-                        type="number"
-                        min={1}
-                        value={editState.jumlahPorsi}
-                        onChange={(e) => setEditState((s) => ({ ...s, jumlahPorsi: e.target.value }))}
-                        className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                      />
-                      <GiziFields
-                        value={editState.gizi}
-                        onChange={(next) => setEditState((s) => ({ ...s, gizi: next }))}
-                      />
-                      <div className="space-y-1">
-                        <label className="text-xs text-neutral-500">Ganti foto (opsional)</label>
-                        <FotoInput
-                          file={editState.foto}
-                          onChange={(f) => setEditState((s) => ({ ...s, foto: f }))}
-                          placeholder="Pilih foto baru..."
-                        />
-                      </div>
-                      {rowError && <p className="text-xs text-red-600">{rowError}</p>}
-                      <div className="flex gap-2">
-                        <button
-                          disabled={busy}
-                          onClick={() => saveEdit(menu.id)}
-                          className="flex-1 rounded-md bg-neutral-900 text-white text-sm py-2 disabled:opacity-60"
-                        >
-                          {busy ? "Menyimpan..." : "Simpan"}
-                        </button>
-                        <button
-                          onClick={() => setEditingId(null)}
-                          className="flex-1 rounded-md border border-neutral-300 text-sm py-2"
-                        >
-                          Batal
-                        </button>
-                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                  );
+                })}
+              </div>
+            </div>
 
-        <PengaduanPanel
-          endpoint="/api/sppg/pengaduan"
-          title="Pengaduan Masuk"
-          readOnly
-          showSubmitter
-        />
+            <PengaduanPanel endpoint="/api/sppg/pengaduan" title="Pengaduan Masuk" readOnly showSubmitter />
+          </div>
+
+          <PanelKebutuhanKhusus sekolahList={sekolahList} />
+        </div>
       </main>
     </DashboardShell>
   );
