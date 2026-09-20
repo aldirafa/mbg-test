@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { checkTriangulasi } from "@/lib/triangulasi";
 import { itemGagal, ringkasanItemGagal } from "@/lib/bgn-checklist";
+import { klasifikasiKetepatanWaktu } from "@/lib/ketepatan-waktu";
 
 const BATAS_JAM = 4;
 
@@ -75,6 +76,13 @@ export async function POST(req: Request) {
 
   const bermasalah = masalah.length > 0;
 
+  // Klasifikasi ketepatan waktu (rekap statistik Dinas) -- TERPISAH dari cek batas 4 jam
+  // BGN di atas (itu tetap jadi alasan "bermasalah"; ini murni buat statistik, gak
+  // mempengaruhi status distribusi). Cuma dihitung kalau waktuKirim ada.
+  const ketepatanWaktu = existing.waktuKirim
+    ? klasifikasiKetepatanWaktu(existing.waktuKirim, waktuTerimaDate)
+    : null;
+
   const distribusi = await prisma.distribusi.update({
     where: { id: distribusiId },
     data: {
@@ -86,6 +94,7 @@ export async function POST(req: Request) {
       layakCount,
       tidakLayakCount,
       checklistBgn,
+      ketepatanWaktu,
       catatan: bermasalah ? masalah.join(" ") : null,
     },
     include: { menu: { include: { sppg: true } } },

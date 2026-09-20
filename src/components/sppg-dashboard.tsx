@@ -21,6 +21,7 @@ import {
   KATEGORI_ALERGI,
   type DataKebutuhanKhusus,
 } from "@/lib/kebutuhan-khusus";
+import { PANDUAN_DISABILITAS, PANDUAN_ALERGI, CATATAN_PANDUAN_KHUSUS } from "@/lib/kebutuhan-khusus-panduan";
 
 // --- Tipe data dari server ---------------------------------------------------------
 
@@ -533,29 +534,68 @@ function PanelKebutuhanKhusus({ sekolahList }: { sekolahList: SekolahRingkas[] }
       <div>
         <p className="text-xs font-medium text-neutral-600 mb-1.5">Disabilitas</p>
         {!adaDisabilitas && <p className="text-xs text-neutral-400">Belum ada data.</p>}
-        <div className="space-y-1">
-          {KATEGORI_DISABILITAS.filter((k) => (disabilitas[k.kode] ?? 0) > 0).map((k) => (
-            <div key={k.kode} className="flex items-center justify-between text-xs">
-              <span className="text-neutral-600">
-                {k.kode} &middot; {k.label}
-              </span>
-              <span className="font-medium text-neutral-900">{disabilitas[k.kode]}</span>
-            </div>
-          ))}
+        <div className="space-y-1.5">
+          {KATEGORI_DISABILITAS.filter((k) => (disabilitas[k.kode] ?? 0) > 0).map((k) => {
+            const panduan = PANDUAN_DISABILITAS.find((p) => p.kode === k.kode);
+            return (
+              <Expandable
+                key={k.kode}
+                summary={
+                  <span className="flex-1 flex items-center justify-between">
+                    <span>
+                      {k.kode} &middot; {k.label}
+                    </span>
+                    <span className="font-medium text-neutral-900">{disabilitas[k.kode]}</span>
+                  </span>
+                }
+              >
+                {panduan && (
+                  <p className="text-xs text-neutral-600 pl-4.5">
+                    <span className="font-medium text-neutral-700">Perhatian komposisi makanan: </span>
+                    {panduan.perhatianKomposisi}
+                  </p>
+                )}
+              </Expandable>
+            );
+          })}
         </div>
       </div>
 
       <div>
         <p className="text-xs font-medium text-neutral-600 mb-1.5">Alergi / pantangan</p>
         {!adaAlergi && <p className="text-xs text-neutral-400">Belum ada data.</p>}
-        <div className="space-y-1">
-          {KATEGORI_ALERGI.filter((k) => (alergi[k.kode] ?? 0) > 0).map((k) => (
-            <div key={k.kode} className="flex items-center justify-between text-xs">
-              <span className="text-neutral-600">{k.label}</span>
-              <span className="font-medium text-neutral-900">{alergi[k.kode]}</span>
-            </div>
-          ))}
+        <div className="space-y-1.5">
+          {KATEGORI_ALERGI.filter((k) => (alergi[k.kode] ?? 0) > 0).map((k) => {
+            const panduan = PANDUAN_ALERGI.find((p) => p.kode === k.kode);
+            return (
+              <Expandable
+                key={k.kode}
+                summary={
+                  <span className="flex-1 flex items-center justify-between">
+                    <span>{k.label}</span>
+                    <span className="font-medium text-neutral-900">{alergi[k.kode]}</span>
+                  </span>
+                }
+              >
+                {panduan && (
+                  <div className="text-xs text-neutral-600 pl-4.5 space-y-1">
+                    <p>
+                      <span className="font-medium text-neutral-700">Perhatian komposisi makanan: </span>
+                      {panduan.perhatianKomposisi}
+                    </p>
+                    <p>
+                      <span className="font-medium text-neutral-700">Pengganti: </span>
+                      {panduan.pengganti}
+                    </p>
+                  </div>
+                )}
+              </Expandable>
+            );
+          })}
         </div>
+        {(adaDisabilitas || adaAlergi) && (
+          <p className="text-[11px] text-neutral-400 italic mt-2">{CATATAN_PANDUAN_KHUSUS}</p>
+        )}
       </div>
 
       <Expandable summary="Rincian per sekolah">

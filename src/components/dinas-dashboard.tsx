@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { SekolahLokasiManager } from "@/components/sekolah-lokasi-manager";
+import { SppgProfilManager } from "@/components/sppg-profil-manager";
 import { PengaduanManager } from "@/components/pengaduan-manager";
 import { FeedbackAnakViewer } from "@/components/feedback-anak-viewer";
 import { SegmentedRadioGroup } from "@/components/ui/radio-group";
+import { DinasStatistik } from "@/components/dinas-statistik";
 
 type Flag = {
   id: string;
@@ -84,6 +86,8 @@ export function DinasDashboard() {
   return (
     <DashboardShell title="Dashboard Dinas" subtitle="Flag triangulasi otomatis dari SPPG, sekolah & orangtua">
       <main className="max-w-5xl mx-auto p-6 space-y-5">
+        <DinasStatistik />
+
         <div className="grid grid-cols-3 gap-3">
           <div className="border border-neutral-200 rounded-lg p-4">
             <div className="text-2xl font-semibold">{counts.terbuka}</div>
@@ -189,6 +193,7 @@ export function DinasDashboard() {
         </div>
 
         <SekolahLokasiManager />
+        <SppgProfilManager />
         <PengaduanManager />
         <FeedbackAnakViewer />
       </main>

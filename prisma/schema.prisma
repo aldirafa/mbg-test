@@ -57,6 +57,35 @@ enum SumberGizi {
   protein
 }
 
+enum PenilaianAnak {
+  suka
+  biasa
+  tidak_suka
+}
+
+enum KondisiHabis {
+  habis
+  sisa_sedikit
+  sisa_banyak
+}
+
+enum KondisiKemasan {
+  bersih_rapi
+  cukup_bersih
+  kurang_bersih
+}
+
+// Klasifikasi ketepatan waktu kirim->terima (revisi feedback 20 Sep) -- TERPISAH dari
+// aturan 4 jam checklist BGN (itu tetap cek keamanan pangan, gak diganti). Ini buat
+// rekap statistik Dinas. Threshold blm dikasih angka pasti dari tim -- JUDGMENT CALL:
+// <=15 menit = tepat_waktu, 15-30 menit = terlambat_ringan, >30 menit = terlambat_berat
+// (lihat src/lib/ketepatan-waktu.ts & README, gampang diubah kalau angkanya beda).
+enum KetepatanWaktu {
+  tepat_waktu
+  terlambat_ringan
+  terlambat_berat
+}
+
 model User {
   id           String   @id @default(cuid())
   nama         String
@@ -79,6 +108,10 @@ model Sppg {
   alamat      String
   kontak      String?
   statusAktif Boolean  @default(true) @map("status_aktif")
+  // Teks bebas (bukan dropdown resmi) -- dipakai buat filter dashboard statistik Dinas.
+  // Diisi manual sama Dinas/Admin lewat SppgProfilManager.
+  provinsi       String? @map("provinsi")
+  kabupatenKota  String? @map("kabupaten_kota")
 
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   sekolahList Sekolah[]
@@ -108,6 +141,10 @@ model Sekolah {
   // src/lib/kebutuhan-khusus.ts buat daftar kategori & shape lengkapnya.
   disabilitasData Json? @map("disabilitas_data")
   alergiData      Json? @map("alergi_data")
+  // Teks bebas (bukan dropdown resmi) -- dipakai buat filter dashboard statistik Dinas.
+  // Diisi manual sama Dinas/Admin lewat SekolahLokasiManager.
+  provinsi       String? @map("provinsi")
+  kabupatenKota  String? @map("kabupaten_kota")
 
   user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   sppg   Sppg      @relation(fields: [sppgId], references: [id])
@@ -115,6 +152,7 @@ model Sekolah {
   distribusi Distribusi[]
   ratings       Rating[]
   pengaduanList Pengaduan[]
+  refleksiMingguan RefleksiMingguan[]
 
   @@map("sekolah")
 }
@@ -146,6 +184,7 @@ model Siswa {
   orangtua            Orangtua?            @relation(fields: [orangtuaId], references: [id])
   konfirmasiOrangtua  KonfirmasiOrangtua[]
   feedbackAnak        FeedbackAnak[]
+  persetujuanOrangtua PersetujuanOrangtua?
 
   @@map("siswa")
 }
@@ -241,6 +280,10 @@ model Distribusi {
   // Bentuk: { [itemId]: boolean }. Kalau ada item wajib yg gagal, status otomatis
   // "bermasalah" & catatan diisi ringkasan item yg gagal (lihat API konfirmasi sekolah).
   checklistBgn        Json?          @map("checklist_bgn")
+  // Klasifikasi ketepatan waktu (tepat_waktu/terlambat_ringan/terlambat_berat), dihitung
+  // otomatis server-side saat konfirmasi dari selisih waktuKirim->waktuTerima. Dipakai
+  // buat rekap statistik Dinas -- TERPISAH dari cek 4 jam checklist BGN di atas.
+  ketepatanWaktu      KetepatanWaktu? @map("ketepatan_waktu")
   fotoTerimaUrl    String?           @map("foto_terima_url")
   // Geotag = bukti lokasi (evidence), BUKAN gate akses -- beda peran dgn feedback_anak (Fase 2)
   geotagTerimaLat  Float?            @map("geotag_terima_lat")
@@ -304,8 +347,27 @@ model FeedbackAnak {
   id                  String   @id @default(cuid())
   distribusiId        String   @map("distribusi_id")
   siswaId             String   @map("siswa_id")
+  // LEGACY (binary) -- dipertahankan & dihitung OTOMATIS dari field baru di bawah saat
+  // create (backward-compat sama src/lib/triangulasi.ts, gak diubah logicnya). Form baru
+  // (revisi 20 Sep) gak lagi nanya langsung suka/habis sbg ya/tidak -- udah 3-pilihan
+  // (lihat penilaian & kondisiHabis).
   suka                Boolean
   habis               Boolean
+  // Revisi 20 Sep, src/lib/suara-anak.ts: penilaian & kondisi sekarang 3-pilihan (bukan
+  // ya/tidak), plus follow-up alasan multi-select. Semua nullable-at-DB krn data lama
+  // (sebelum revisi ini) cuma punya suka/habis boolean.
+  penilaian              PenilaianAnak?  @map("penilaian")
+  alasanSuka             String[]        @default([]) @map("alasan_suka")
+  alasanKurangSuka       String[]        @default([]) @map("alasan_kurang_suka")
+  alasanKurangSukaLainnya String?        @map("alasan_kurang_suka_lainnya")
+  kondisiHabis           KondisiHabis?   @map("kondisi_habis")
+  alasanTidakHabis       String[]        @default([]) @map("alasan_tidak_habis")
+  alasanTidakHabisLainnya String?        @map("alasan_tidak_habis_lainnya")
+  kondisiKemasan         KondisiKemasan? @map("kondisi_kemasan")
+  perbaikanDiinginkan    String[]        @default([]) @map("perbaikan_diinginkan")
+  // "Lainnya" versi pertanyaan penutup "kalau boleh ubah 1 hal..." -- reuse field lama
+  // (dulu satu-satunya field catatan perbaikan, sekarang jadi teks "Lainnya" pelengkap
+  // multi-select perbaikanDiinginkan di atas).
   catatanPerbaikan    String?  @map("catatan_perbaikan")
   geotagLat           Float?   @map("geotag_lat")
   geotagLng           Float?   @map("geotag_lng")
@@ -321,6 +383,56 @@ model FeedbackAnak {
   // Satu anak cuma bisa ngisi sekali per distribusi (hari) -- inti dari "cegah submit dobel".
   @@unique([distribusiId, siswaId])
   @@map("feedback_anak")
+}
+
+// Formulir persetujuan orang tua (feedback 20 Sep) -- gate sebelum orang tua bisa
+// pakai fitur harian aplikasi. Per ANAK (bukan per akun orang tua), krn kesediaan &
+// info alergi bisa beda per anak. Identitas siswa (nama/kelas) & data orang tua
+// (nama/no WA) diambil dari record Siswa/Orangtua yang udah ada -- form ini cuma
+// nambahin data yang belum ada: no HP kontak khusus program, kesediaan ikut program,
+// info alergi versi orang tua (bebas, beda sama data terstruktur di Sekolah.alergiData
+// yang diisi admin sekolah), & tanda tangan digital.
+// CATATAN: bagian "D. Tanda Tangan Persetujuan" di formulir aslinya gak kebaca lengkap
+// dari screenshot (terpotong) -- diimplementasikan sbg checkbox konfirmasi + nama
+// lengkap yang diketik ulang (dianggap tanda tangan digital), bukan tanda tangan
+// gambar/canvas. Kalau ternyata maksudnya beda, gampang diganti.
+model PersetujuanOrangtua {
+  id                  String   @id @default(cuid())
+  siswaId             String   @unique @map("siswa_id")
+  noHpOrangTua        String   @map("no_hp_orang_tua")
+  bersedia            Boolean
+  alasanTidakBersedia String?  @map("alasan_tidak_bersedia")
+  adaAlergi           Boolean  @map("ada_alergi")
+  jenisAlergi         String?  @map("jenis_alergi")
+  namaTandaTangan     String   @map("nama_tanda_tangan")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  siswa Siswa @relation(fields: [siswaId], references: [id])
+
+  @@map("persetujuan_orangtua")
+}
+
+// Refleksi mingguan sekolah (feedback 20 Sep) -- 2 survei: kendala pelaksanaan MBG
+// (3-pilihan per item) & persepsi program (skala 5 per item), teks & opsi persis di
+// src/lib/refleksi-mingguan.ts. MINGGUAN (bukan harian) -- keputusan eksplisit user.
+// periodeMulai = tanggal Senin minggu itu (WIB), satu submission per sekolah per
+// minggu (upsert, bukan history tak terbatas kayak Rating).
+model RefleksiMingguan {
+  id                 String   @id @default(cuid())
+  sekolahId          String   @map("sekolah_id")
+  periodeMulai       DateTime @db.Date @map("periode_mulai")
+  // Bentuk: { [itemId]: "sudah_diselesaikan" | "belum_diselesaikan" | "tidak" }
+  kendalaJawaban     Json     @map("kendala_jawaban")
+  kendalaLainnyaTeks String?  @map("kendala_lainnya_teks")
+  // Bentuk: { [itemId]: 1..5 }
+  persepsiJawaban    Json     @map("persepsi_jawaban")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  sekolah Sekolah @relation(fields: [sekolahId], references: [id])
+
+  @@unique([sekolahId, periodeMulai])
+  @@map("refleksi_mingguan")
 }
 
 // Fase 2, Bagian 6.4 -- skor berkala dari sekolah & orangtua ke SPPG. MVP: rater bisa

@@ -8,6 +8,7 @@ import { LokasiSekolahCard } from "@/components/lokasi-sekolah-card";
 import { RatingWidget } from "@/components/rating-widget";
 import { PengaduanPanel } from "@/components/pengaduan-panel";
 import { SekolahKebutuhanKhususForm } from "@/components/sekolah-kebutuhan-khusus-form";
+import { SekolahRefleksiMingguanForm } from "@/components/sekolah-refleksi-mingguan-form";
 import { LabeledCheckbox } from "@/components/ui/checkbox";
 import { Expandable } from "@/components/ui/expandable";
 import { RingkasanGiziSiklus } from "@/components/gizi-siklus-summary";
@@ -16,6 +17,7 @@ import { TZ_OPSI, TZ_TIMEZONE, type Tz, tanggalJamSekarang, tanggalJamTzKeIso } 
 import { SegmentedRadioGroup } from "@/components/ui/radio-group";
 import type { JenjangBgn } from "@/lib/bgn";
 import { LABEL_SUMBER_GIZI, type SumberGizi } from "@/lib/sumber-gizi";
+import { LABEL_KETEPATAN_WAKTU, type KlasifikasiKetepatanWaktu } from "@/lib/ketepatan-waktu";
 
 type MenuItemData = {
   id: string;
@@ -35,6 +37,8 @@ type Distribusi = {
   id: string;
   status: string;
   waktuKirim: string | null;
+  waktuTerima: string | null;
+  ketepatanWaktu: KlasifikasiKetepatanWaktu | null;
   porsiDiterima: number | null;
   porsiDiterimaUmum: number | null;
   porsiDiterimaKhusus: number | null;
@@ -436,6 +440,22 @@ export function SekolahDashboard() {
               })}{" "}
               &middot; {d.menu.jumlahPorsi} porsi
             </div>
+            {d.ketepatanWaktu && (
+              <div className="mt-1">
+                <span
+                  className={
+                    "text-xs rounded-full px-2 py-0.5 " +
+                    (d.ketepatanWaktu === "tepat_waktu"
+                      ? "bg-green-50 text-green-700"
+                      : d.ketepatanWaktu === "terlambat_ringan"
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-red-50 text-red-700")
+                  }
+                >
+                  {LABEL_KETEPATAN_WAKTU[d.ketepatanWaktu]}
+                </span>
+              </div>
+            )}
           </div>
           <span
             className={
@@ -556,6 +576,7 @@ export function SekolahDashboard() {
       <main className="max-w-lg mx-auto p-6 space-y-4">
         <LokasiSekolahCard />
         <SekolahKebutuhanKhususForm />
+        <SekolahRefleksiMingguanForm />
         <div className="border border-neutral-200 rounded-lg p-4">
           <RatingWidget endpoint="/api/sekolah/rating" label="Kasih rating buat SPPG" />
         </div>

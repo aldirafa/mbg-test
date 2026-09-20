@@ -473,3 +473,130 @@ push` sekali lagi lokal.**
   keamanan endpoint publik `/api/anak/feedback` & `/api/publik/stats`
   terhadap abuse/rate-limit) -- belum dikerjakan, ini langkah berikutnya
   yang disepakati (Fase 2 dulu, QA sekali di akhir).
+
+### Revisi besar 20 Sep (feedback tim Prof Elly -- consent orangtua, panduan
+### kebutuhan khusus, refleksi mingguan, redesign Suara Anak, dashboard statistik Dinas)
+
+Batch besar, 9 fitur/perubahan sekaligus. Beberapa keputusan di bawah adalah
+**judgment call** krn spek yang dikasih tim gak selalu ngasih definisi presisi --
+semua gampang direvisi begitu dikonfirmasi ulang.
+
+**1. Formulir Persetujuan Orang Tua** (`PersetujuanOrangtua`, gate di
+`PersetujuanOrangtuaGate`/`formulir-persetujuan-orangtua.tsx`, dipasang di
+`OrangtuaDashboard`): orang tua WAJIB isi & submit formulir ini sebelum bisa akses
+fitur harian (menu, konfirmasi terima, rating, pengaduan) -- keputusan eksplisit user:
+**per ANAK**, bukan per akun orang tua (dashboard diblokir sampai SEMUA anak yang
+terhubung ke akun itu udah punya record persetujuan). Identitas siswa (nama, kelas) &
+nama orang tua ditampilkan read-only dari data yang udah ada; formulir cuma nambahin
+No. HP kontak program, kesediaan ikut program (+ alasan kalau tidak bersedia), info
+alergi versi orang tua (bebas teks, beda dari data terstruktur `Sekolah.alergiData`
+yang diisi admin sekolah), & konfirmasi "tanda tangan". **Catatan penting**: bagian "D.
+Tanda Tangan Persetujuan" di screenshot formulir asli yang dikasih user gak kebaca
+lengkap (terpotong) -- diimplementasikan sbg checkbox konfirmasi + nama lengkap yang
+diketik ulang (dianggap tanda tangan digital), BUKAN tanda tangan gambar/canvas. Kalau
+ternyata maksud aslinya beda, gampang diganti di `formulir-persetujuan-orangtua.tsx` &
+model `PersetujuanOrangtua`.
+
+**2. Panduan deskriptif kebutuhan khusus** (BUKAN angka AKG resmi -- tim sendiri bilang
+belum nemu standar resmi buat kondisi disabilitas/alergi, jadi yang ditampilkan cuma
+info deskriptif "perhatian komposisi" + "pengganti"/"implikasi penyajian"):
+- **Versi SPPG** (`src/lib/kebutuhan-khusus-panduan.ts`, tampil di `PanelKebutuhanKhusus`
+  sppg-dashboard): disabilitas (kolom "Perhatian komposisi makanan") + alergi (kolom
+  "Perhatian komposisi makanan" + "Pengganti"). Cuma nampilin kondisi yang datanya ada
+  (jumlah > 0), lewat `Expandable` per kondisi.
+- **Versi Sekolah** (`src/lib/kebutuhan-khusus-implikasi.ts`, tampil di
+  `SekolahKebutuhanKhususForm`): disabilitas versi lebih detail dgn kolom tambahan
+  "Implikasi penyajian" (cara mendampingi/menyajikan di lapangan). **Judgment call**:
+  tim cuma ngasih tabel "Implikasi penyajian" versi disabilitas (bukan alergi) buat
+  ditampilkan "di dashboard sekolah" -- karena gak ada versi allergy-nya, Sekolah tetap
+  ditampilkan tabel alergi yang SAMA kayak versi SPPG (komposisi + pengganti), krn
+  sekolah jelas juga butuh info ini pas nerima/nyiapin makanan buat anak alergi. Kalau
+  ternyata Sekolah gak perlu lihat tabel alergi ini, gampang dihapus.
+- Teks kedua tabel disalin **verbatim** dari markdown yang dikasih tim, termasuk
+  redundansi "Tidak ada koreksi gizi khusus" utk Tunanetra/Tunarungu.
+
+**3. Ketepatan waktu distribusi** (`Distribusi.ketepatanWaktu`, dihitung otomatis di
+`/api/sekolah/konfirmasi` dari selisih `waktuKirim`->`waktuTerima`, **TERPISAH** dari
+aturan batas 4 jam checklist BGN yang udah ada -- itu tetap soal keamanan pangan, gak
+diubah). **Judgment call besar**: tim cuma kasih SATU angka acuan eksplisit ("Terlambat
+> 15 menit") ke chat, tapi dashboard Dinas minta 3 bucket ("Tepat waktu" / "Terlambat
+<= 15 menit" / "Terlambat > 15 menit") tanpa nentuin batas presisi antara "tepat waktu"
+dan "terlambat <=15 menit" (transit kirim->terima secara alami gak pernah 0 menit, jadi
+gak ada baseline "0 menit = tepat waktu" yang natural). Threshold yang dipakai sekarang
+(`src/lib/ketepatan-waktu.ts`):
+  - `<= 15 menit` &rarr; **Tepat waktu**
+  - `15-30 menit` &rarr; **Terlambat ringan**
+  - `> 30 menit` &rarr; **Terlambat berat**
+  Ini sengaja dipecah jadi 3 klasifikasi yang lebih informatif drpd cuma 2-bucket
+  ("tepat waktu" vs "terlambat >15 menit") biar rekap Dinas lebih berguna -- gampang
+  digabung balik ke 2-bucket kalau tim mau strict ke wording asli. **Kalau tim kasih
+  angka resmi lain, tinggal ubah 2 konstanta di `src/lib/ketepatan-waktu.ts`.**
+
+**4. Refleksi Mingguan Sekolah** (`RefleksiMingguan`, satu submission per sekolah per
+minggu -- upsert berdasar `periodeMulai` = tanggal Senin minggu itu WIB, bukan histori
+tak terbatas kayak `Rating`): 2 survei checkbox, teks & opsi verbatim dari tim --
+"kendala pelaksanaan MBG" (5 item, jawaban 3-way + "Lainnya" teks bebas di item ke-5) &
+"persepsi sekolah" (5 item, skala 5 Sangat Setuju..Sangat Tidak Setuju). **Judgment
+call**: tim nanya sendiri "FORMAT MINGGUAN/HARIAN BAIKNYA YA?" di pesannya -- dipilih
+**MINGGUAN** (dikonfirmasi eksplisit lewat clarifying question). Form ada di
+`SekolahRefleksiMingguanForm`, status "sudah/belum isi minggu ini" ditampilkan sbg
+badge; Dinas lihat rekapnya (breakdown persentase per item, per bulan) di
+`DinasStatistik`.
+
+**5. Provinsi & Kabupaten/Kota** (`Sppg.provinsi`/`kabupatenKota`,
+`Sekolah.provinsi`/`kabupatenKota`, dikelola Dinas lewat `SekolahLokasiManager` yang
+diperluas & `SppgProfilManager` baru): **teks bebas, BUKAN dropdown dari daftar resmi**
+(keputusan eksplisit user) -- dipakai sbg filter dashboard statistik Dinas. Konsekuensi:
+filter provinsi/kabupaten di `DinasStatistik` cocok persis (exact match) sama teks yang
+diisi manual, jadi rawan typo/inkonsistensi ejaan antar SPPG/sekolah -- kalau ini jadi
+masalah nyata pas dipakai, upgrade ke dropdown dari daftar wilayah resmi (Kemendagri)
+adalah langkah lanjutan yang jelas.
+
+**6. Redesign Suara Anak / Child Voice Interface** (`src/lib/suara-anak.ts`,
+`SuaraAnakForm`, `/api/anak/feedback`): teks intro + semua pertanyaan/opsi/emoji
+disalin **verbatim** dari spek tim. Perubahan utama: 2 pertanyaan biner lama
+(suka/habis ya-tidak) jadi 3-pilihan (`PenilaianAnak`, `KondisiHabis`) + follow-up
+multi-select kondisional (`alasanSuka` kalau suka; `alasanKurangSuka` kalau
+biasa/tidak suka; `alasanTidakHabis` kalau ada sisa), pertanyaan baru "kondisi kemasan"
+(`KondisiKemasan`), & pertanyaan penutup "ada yang mau diperbaiki" (teks bebas) diganti
+jadi multi-select + "Lainnya" (`perbaikanDiinginkan`, teks lainnya reuse field lama
+`catatanPerbaikan`). **Field lama `suka`/`habis` (Boolean) TETAP dipertahankan &
+dihitung OTOMATIS dari field baru saat create** (`suka = penilaian !== "tidak_suka"`,
+`habis = kondisiHabis === "habis"`) -- `src/lib/triangulasi.ts` yang baca kedua field
+itu SENGAJA gak disentuh sama sekali biar agregasi triangulasi lama tetap jalan persis
+kayak sebelumnya. Data lama (submit sebelum revisi ini) otomatis fallback ke boolean
+legacy di semua tempat yang nampilin data ini (`FeedbackAnakViewer`, `/api/dinas/
+analitik`).
+
+**7. Dashboard Statistik Dinas** (`DinasStatistik`, konsumsi `GET /api/dinas/
+analitik?bulan=&tahun=&provinsi=&kabupatenKota=&jenjang=`) -- satu endpoint gabungan
+biar filter diterapkan konsisten ke semua bagian: ketepatan waktu (rata-rata jam kirim/
+terima pagi-siang + distribusi 3-bucket), % porsi diterima vs dikirim (bulanan), rekap
+refleksi mingguan sekolah (breakdown persentase per item kendala + rata-rata skala
+persepsi), data Suara Anak (breakdown penilaian/kondisi habis + top alasan disukai/
+ingin diperbaiki), rata-rata rating orang tua, & "Data Dinas". **Judgment call buat
+"Data Dinas"** (spek asli cuma nyebut nama metrik tanpa definisi persis):
+  - **% sekolah melakukan pelaporan** = sekolah yang punya >=1 distribusi dgn status
+    udah dikonfirmasi (`diterima`/`bermasalah`, bukan cuma `dikirim` & didiemin) dalam
+    periode filter, dibagi total sekolah yang cocok filter.
+  - **% sekolah terpantau** = superset dari pelaporan -- sekolah yang punya >=1
+    distribusi TERCATAT sama sekali (SPPG udah kirim, terlepas udah dikonfirmasi atau
+    belum) dalam periode itu.
+  - **% kendala ditindaklanjuti** = `FlagTriangulasi` (masalah yang kedeteksi OTOMATIS
+    oleh sistem triangulasi) yang statusnya udah bergerak dari "terbuka", dibagi total
+    flag di periode itu.
+  - **% laporan diselesaikan** = `Pengaduan` (komplain yang diajukan MANUAL oleh
+    sekolah/orangtua) yang statusnya "selesai", dibagi total pengaduan di periode itu.
+  Kalau definisi resminya beda, keempatnya gampang diubah di
+  `src/app/api/dinas/analitik/route.ts` (bagian "Data Dinas", ada komentar sama persis
+  di kode).
+- Rating orang tua discope lewat anak-anak mereka yang sekolahnya cocok filter (model
+  `Rating` orang tua gak nyimpen `sekolahId` langsung, cuma `orangtuaId` -- lihat
+  komentar di model `Rating`).
+
+**Kolom & model Prisma baru (BANYAK) -- WAJIB jalanin `npx prisma generate && npx
+prisma db push` lagi lokal sebelum testing.** Model baru: `PersetujuanOrangtua`,
+`RefleksiMingguan`. Enum baru: `PenilaianAnak`, `KondisiHabis`, `KondisiKemasan`,
+`KetepatanWaktu`. Field baru: `Sppg`/`Sekolah.provinsi`/`kabupatenKota`,
+`Distribusi.ketepatanWaktu`, dan ~9 field baru di `FeedbackAnak`. Semua nullable/ada
+default di level DB biar data lama gak rusak.

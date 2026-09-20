@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { Expandable } from "@/components/ui/expandable";
 import { KATEGORI_DISABILITAS, KATEGORI_ALERGI, type DataKebutuhanKhusus } from "@/lib/kebutuhan-khusus";
+import { IMPLIKASI_DISABILITAS } from "@/lib/kebutuhan-khusus-implikasi";
+import { PANDUAN_ALERGI, CATATAN_PANDUAN_KHUSUS } from "@/lib/kebutuhan-khusus-panduan";
 
 type Jenjang = "SD" | "SMP" | "SMA";
 
@@ -166,6 +168,64 @@ export function SekolahKebutuhanKhususForm() {
           ))}
         </div>
       </Expandable>
+
+      {(() => {
+        const disabilitasAda = KATEGORI_DISABILITAS.filter((k) => Number(disabilitas[k.kode]?.jumlah) > 0);
+        const alergiAda = KATEGORI_ALERGI.filter((k) => Number(alergi[k.kode]?.jumlah) > 0);
+        if (disabilitasAda.length === 0 && alergiAda.length === 0) return null;
+        return (
+          <div className="space-y-3 border-t border-neutral-100 pt-3">
+            <p className="text-xs font-medium text-neutral-600">
+              Panduan penyajian &amp; komposisi (berdasarkan data di atas)
+            </p>
+            {disabilitasAda.length > 0 && (
+              <div className="space-y-2">
+                {disabilitasAda.map((k) => {
+                  const panduan = IMPLIKASI_DISABILITAS.find((p) => p.kode === k.kode);
+                  if (!panduan) return null;
+                  return (
+                    <Expandable key={k.kode} summary={`${k.kode} · ${k.label}`}>
+                      <div className="text-xs text-neutral-600 pl-4.5 space-y-1">
+                        <p>
+                          <span className="font-medium text-neutral-700">Perhatian mikronutrien &amp; komposisi: </span>
+                          {panduan.perhatianMikronutrien}
+                        </p>
+                        <p>
+                          <span className="font-medium text-neutral-700">Implikasi penyajian: </span>
+                          {panduan.implikasiPenyajian}
+                        </p>
+                      </div>
+                    </Expandable>
+                  );
+                })}
+              </div>
+            )}
+            {alergiAda.length > 0 && (
+              <div className="space-y-2">
+                {alergiAda.map((k) => {
+                  const panduan = PANDUAN_ALERGI.find((p) => p.kode === k.kode);
+                  if (!panduan) return null;
+                  return (
+                    <Expandable key={k.kode} summary={k.label}>
+                      <div className="text-xs text-neutral-600 pl-4.5 space-y-1">
+                        <p>
+                          <span className="font-medium text-neutral-700">Perhatian komposisi makanan: </span>
+                          {panduan.perhatianKomposisi}
+                        </p>
+                        <p>
+                          <span className="font-medium text-neutral-700">Pengganti: </span>
+                          {panduan.pengganti}
+                        </p>
+                      </div>
+                    </Expandable>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[11px] text-neutral-400 italic">{CATATAN_PANDUAN_KHUSUS}</p>
+          </div>
+        );
+      })()}
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 

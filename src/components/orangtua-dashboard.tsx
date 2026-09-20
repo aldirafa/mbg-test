@@ -5,6 +5,7 @@ import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { RatingWidget } from "@/components/rating-widget";
 import { PengaduanPanel } from "@/components/pengaduan-panel";
+import { PersetujuanOrangtuaGate } from "@/components/formulir-persetujuan-orangtua";
 import { formatAngkaID } from "@/lib/format";
 
 type ChildData = {
@@ -108,6 +109,7 @@ export function OrangtuaDashboard() {
   }
 
   return (
+    <PersetujuanOrangtuaGate>
     <DashboardShell title="Portal Orang Tua" subtitle="Menu hari ini & konfirmasi anak menerima makan">
       <main className="max-w-lg mx-auto p-6 space-y-6">
         {loading && <p className="text-sm text-neutral-500">Memuat...</p>}
@@ -303,5 +305,6 @@ export function OrangtuaDashboard() {
         )}
       </main>
     </DashboardShell>
+    </PersetujuanOrangtuaGate>
   );
 }

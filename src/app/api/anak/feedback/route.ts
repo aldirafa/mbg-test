@@ -9,11 +9,24 @@ import { checkTriangulasi } from "@/lib/triangulasi";
 // dipakai buat resolve ke siswa & mastiin 1 anak gak ngisi 2x per distribusi (hari) --
 // BUKAN dibalikin ke client atau ditampilkan bebas ke role selain admin (lihat
 // src/app/api/dinas/feedback-anak/route.ts).
+//
+// Revisi 20 Sep (feedback tim Prof Elly): penilaian & kondisi sekarang 3-pilihan
+// (bukan ya/tidak) + follow-up multi-select kondisional, lihat src/lib/suara-anak.ts
+// buat opsi lengkap & aturan tampil follow-up mana. `suka`/`habis` boolean LEGACY
+// dihitung OTOMATIS di sini dari field baru -- src/lib/triangulasi.ts (yg baca kedua
+// field itu) SENGAJA gak disentuh biar agregasi triangulasi lama tetap jalan.
 const bodySchema = z.object({
   nisNisn: z.string().min(1),
-  suka: z.boolean(),
-  habis: z.boolean(),
-  catatanPerbaikan: z.string().optional(),
+  penilaian: z.enum(["suka", "biasa", "tidak_suka"]),
+  alasanSuka: z.array(z.string()).default([]),
+  alasanKurangSuka: z.array(z.string()).default([]),
+  alasanKurangSukaLainnya: z.string().optional(),
+  kondisiHabis: z.enum(["habis", "sisa_sedikit", "sisa_banyak"]),
+  alasanTidakHabis: z.array(z.string()).default([]),
+  alasanTidakHabisLainnya: z.string().optional(),
+  kondisiKemasan: z.enum(["bersih_rapi", "cukup_bersih", "kurang_bersih"]),
+  perbaikanDiinginkan: z.array(z.string()).default([]),
+  catatanPerbaikan: z.string().optional(), // teks "Lainnya" pelengkap perbaikanDiinginkan
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
 });
@@ -23,7 +36,21 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
   }
-  const { nisNisn, suka, habis, catatanPerbaikan, lat, lng } = parsed.data;
+  const {
+    nisNisn,
+    penilaian,
+    alasanSuka,
+    alasanKurangSuka,
+    alasanKurangSukaLainnya,
+    kondisiHabis,
+    alasanTidakHabis,
+    alasanTidakHabisLainnya,
+    kondisiKemasan,
+    perbaikanDiinginkan,
+    catatanPerbaikan,
+    lat,
+    lng,
+  } = parsed.data;
 
   const siswa = await prisma.siswa.findUnique({
     where: { nisNisn },
@@ -69,8 +96,18 @@ export async function POST(req: Request) {
     data: {
       distribusiId: distribusi.id,
       siswaId: siswa.id,
-      suka,
-      habis,
+      // LEGACY, dihitung otomatis dari field baru -- lihat komentar di schema.prisma.
+      suka: penilaian !== "tidak_suka",
+      habis: kondisiHabis === "habis",
+      penilaian,
+      alasanSuka,
+      alasanKurangSuka,
+      alasanKurangSukaLainnya: alasanKurangSukaLainnya || null,
+      kondisiHabis,
+      alasanTidakHabis,
+      alasanTidakHabisLainnya: alasanTidakHabisLainnya || null,
+      kondisiKemasan,
+      perbaikanDiinginkan,
       catatanPerbaikan: catatanPerbaikan || null,
       geotagLat: lat ?? null,
       geotagLng: lng ?? null,

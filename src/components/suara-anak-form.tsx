@@ -1,20 +1,129 @@
 "use client";
 
 import { useState } from "react";
+import {
+  INTRO_SUARA_ANAK,
+  PERTANYAAN_PENILAIAN,
+  OPSI_PENILAIAN,
+  PERTANYAAN_ALASAN_SUKA,
+  OPSI_ALASAN_SUKA,
+  PERTANYAAN_ALASAN_KURANG_SUKA,
+  OPSI_ALASAN_KURANG_SUKA,
+  tampilkanAlasanSuka,
+  tampilkanAlasanKurangSuka,
+  PERTANYAAN_KONDISI_HABIS,
+  OPSI_KONDISI_HABIS,
+  PERTANYAAN_ALASAN_TIDAK_HABIS,
+  OPSI_ALASAN_TIDAK_HABIS,
+  tampilkanAlasanTidakHabis,
+  PERTANYAAN_KONDISI_KEMASAN,
+  OPSI_KONDISI_KEMASAN,
+  PERTANYAAN_PERBAIKAN,
+  OPSI_PERBAIKAN,
+  type OpsiSuaraAnak,
+} from "@/lib/suara-anak";
 
 type Step = "form" | "submitting" | "sukses" | "error";
 
+// Tombol besar emoji buat pilihan 3-way (penilaian / kondisi habis / kondisi kemasan).
+function TombolEmoji<T extends string>({
+  opsi,
+  value,
+  onChange,
+}: {
+  opsi: OpsiSuaraAnak[];
+  value: T | null;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex gap-2">
+      {opsi.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value as T)}
+          className={
+            "flex-1 rounded-xl border-2 py-3 px-1 text-center " +
+            (value === o.value ? "border-neutral-900 bg-neutral-50" : "border-neutral-200")
+          }
+        >
+          <div className="text-2xl leading-none">{o.label.split(" ")[0]}</div>
+          <div className="text-[11px] mt-1 leading-tight">{o.label.split(" ").slice(1).join(" ")}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Checkbox chip multi-select, dipakai buat semua pertanyaan follow-up "bisa pilih
+// lebih dari satu" -- opsi dgn butuhTeksLainnya nampilin input teks tambahan pas dipilih.
+function MultiSelectChips({
+  opsi,
+  value,
+  onToggle,
+  teksLainnya,
+  onTeksLainnyaChange,
+}: {
+  opsi: OpsiSuaraAnak[];
+  value: string[];
+  onToggle: (v: string) => void;
+  teksLainnya?: string;
+  onTeksLainnyaChange?: (v: string) => void;
+}) {
+  const opsiLainnya = opsi.find((o) => o.butuhTeksLainnya);
+  const lainnyaDipilih = opsiLainnya != null && value.includes(opsiLainnya.value);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {opsi.map((o) => (
+          <button
+            key={o.value}
+            onClick={() => onToggle(o.value)}
+            className={
+              "rounded-full border-2 px-3 py-1.5 text-xs " +
+              (value.includes(o.value) ? "border-neutral-900 bg-neutral-50" : "border-neutral-200")
+            }
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {lainnyaDipilih && onTeksLainnyaChange && (
+        <input
+          value={teksLainnya ?? ""}
+          onChange={(e) => onTeksLainnyaChange(e.target.value)}
+          placeholder="Sebutkan..."
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        />
+      )}
+    </div>
+  );
+}
+
 // Formulir publik (tanpa login) Child Voice Interface -- diakses lewat QR di lingkungan
 // sekolah. Sengaja simpel & besar tombolnya (emoji), soalnya dipakai anak-anak.
+// Redesign 20 Sep (feedback tim Prof Elly) -- lihat src/lib/suara-anak.ts buat teks &
+// opsi verbatim yang dikasih tim.
 export function SuaraAnakForm() {
   const [nisNisn, setNisNisn] = useState("");
-  const [suka, setSuka] = useState<boolean | null>(null);
-  const [habis, setHabis] = useState<boolean | null>(null);
-  const [catatan, setCatatan] = useState("");
+  const [penilaian, setPenilaian] = useState<string | null>(null);
+  const [alasanSuka, setAlasanSuka] = useState<string[]>([]);
+  const [alasanKurangSuka, setAlasanKurangSuka] = useState<string[]>([]);
+  const [alasanKurangSukaLainnya, setAlasanKurangSukaLainnya] = useState("");
+  const [kondisiHabis, setKondisiHabis] = useState<string | null>(null);
+  const [alasanTidakHabis, setAlasanTidakHabis] = useState<string[]>([]);
+  const [alasanTidakHabisLainnya, setAlasanTidakHabisLainnya] = useState("");
+  const [kondisiKemasan, setKondisiKemasan] = useState<string | null>(null);
+  const [perbaikanDiinginkan, setPerbaikanDiinginkan] = useState<string[]>([]);
+  const [catatanPerbaikan, setCatatanPerbaikan] = useState("");
   const [step, setStep] = useState<Step>("form");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const bisaKirim = nisNisn.trim().length > 0 && suka !== null && habis !== null;
+  function toggle(list: string[], setList: (v: string[]) => void, value: string) {
+    setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  }
+
+  const bisaKirim = nisNisn.trim().length > 0 && penilaian !== null && kondisiHabis !== null && kondisiKemasan !== null;
 
   function ambilLokasiLaluKirim() {
     setStep("submitting");
@@ -26,9 +135,16 @@ export function SuaraAnakForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nisNisn: nisNisn.trim(),
-          suka,
-          habis,
-          catatanPerbaikan: catatan.trim() || undefined,
+          penilaian,
+          alasanSuka,
+          alasanKurangSuka,
+          alasanKurangSukaLainnya: alasanKurangSukaLainnya.trim() || undefined,
+          kondisiHabis,
+          alasanTidakHabis,
+          alasanTidakHabisLainnya: alasanTidakHabisLainnya.trim() || undefined,
+          kondisiKemasan,
+          perbaikanDiinginkan,
+          catatanPerbaikan: catatanPerbaikan.trim() || undefined,
           lat,
           lng,
         }),
@@ -61,9 +177,16 @@ export function SuaraAnakForm() {
 
   function resetForm() {
     setNisNisn("");
-    setSuka(null);
-    setHabis(null);
-    setCatatan("");
+    setPenilaian(null);
+    setAlasanSuka([]);
+    setAlasanKurangSuka([]);
+    setAlasanKurangSukaLainnya("");
+    setKondisiHabis(null);
+    setAlasanTidakHabis([]);
+    setAlasanTidakHabisLainnya("");
+    setKondisiKemasan(null);
+    setPerbaikanDiinginkan([]);
+    setCatatanPerbaikan("");
     setStep("form");
     setErrorMsg("");
   }
@@ -86,7 +209,7 @@ export function SuaraAnakForm() {
       <div className="text-center space-y-1">
         <div className="text-4xl">🍽️</div>
         <h1 className="text-lg font-semibold">Suara Anak MBG</h1>
-        <p className="text-sm text-neutral-500">Ceritain menu makan siang kamu hari ini yuk!</p>
+        <p className="text-sm text-neutral-500">{INTRO_SUARA_ANAK}</p>
       </div>
 
       <div className="space-y-1">
@@ -100,60 +223,65 @@ export function SuaraAnakForm() {
       </div>
 
       <div className="space-y-2">
-        <div className="text-sm font-medium">Suka gak menunya?</div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setSuka(true)}
-            className={
-              "flex-1 rounded-xl border-2 py-4 text-3xl " +
-              (suka === true ? "border-neutral-900 bg-neutral-50" : "border-neutral-200")
-            }
-          >
-            😋
-          </button>
-          <button
-            onClick={() => setSuka(false)}
-            className={
-              "flex-1 rounded-xl border-2 py-4 text-3xl " +
-              (suka === false ? "border-neutral-900 bg-neutral-50" : "border-neutral-200")
-            }
-          >
-            😕
-          </button>
+        <div className="text-sm font-medium">{PERTANYAAN_PENILAIAN}</div>
+        <TombolEmoji opsi={OPSI_PENILAIAN} value={penilaian} onChange={setPenilaian} />
+      </div>
+
+      {tampilkanAlasanSuka(penilaian) && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium">{PERTANYAAN_ALASAN_SUKA}</div>
+          <MultiSelectChips
+            opsi={OPSI_ALASAN_SUKA}
+            value={alasanSuka}
+            onToggle={(v) => toggle(alasanSuka, setAlasanSuka, v)}
+          />
         </div>
+      )}
+
+      {tampilkanAlasanKurangSuka(penilaian) && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium">{PERTANYAAN_ALASAN_KURANG_SUKA}</div>
+          <MultiSelectChips
+            opsi={OPSI_ALASAN_KURANG_SUKA}
+            value={alasanKurangSuka}
+            onToggle={(v) => toggle(alasanKurangSuka, setAlasanKurangSuka, v)}
+            teksLainnya={alasanKurangSukaLainnya}
+            onTeksLainnyaChange={setAlasanKurangSukaLainnya}
+          />
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <div className="text-sm font-medium">{PERTANYAAN_KONDISI_HABIS}</div>
+        <TombolEmoji opsi={OPSI_KONDISI_HABIS} value={kondisiHabis} onChange={setKondisiHabis} />
+      </div>
+
+      {tampilkanAlasanTidakHabis(kondisiHabis) && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium">{PERTANYAAN_ALASAN_TIDAK_HABIS}</div>
+          <MultiSelectChips
+            opsi={OPSI_ALASAN_TIDAK_HABIS}
+            value={alasanTidakHabis}
+            onToggle={(v) => toggle(alasanTidakHabis, setAlasanTidakHabis, v)}
+            teksLainnya={alasanTidakHabisLainnya}
+            onTeksLainnyaChange={setAlasanTidakHabisLainnya}
+          />
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <div className="text-sm font-medium">{PERTANYAAN_KONDISI_KEMASAN}</div>
+        <TombolEmoji opsi={OPSI_KONDISI_KEMASAN} value={kondisiKemasan} onChange={setKondisiKemasan} />
       </div>
 
       <div className="space-y-2">
-        <div className="text-sm font-medium">Makanannya habis gak?</div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setHabis(true)}
-            className={
-              "flex-1 rounded-xl border-2 py-4 text-3xl " +
-              (habis === true ? "border-neutral-900 bg-neutral-50" : "border-neutral-200")
-            }
-          >
-            🍽️
-          </button>
-          <button
-            onClick={() => setHabis(false)}
-            className={
-              "flex-1 rounded-xl border-2 py-4 text-3xl " +
-              (habis === false ? "border-neutral-900 bg-neutral-50" : "border-neutral-200")
-            }
-          >
-            🥡
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-sm font-medium">Ada yang mau diperbaiki? (opsional)</label>
-        <textarea
-          value={catatan}
-          onChange={(e) => setCatatan(e.target.value)}
-          placeholder="Contoh: sayurnya kurang asin..."
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm min-h-20"
+        <div className="text-sm font-medium">{PERTANYAAN_PERBAIKAN}</div>
+        <MultiSelectChips
+          opsi={OPSI_PERBAIKAN}
+          value={perbaikanDiinginkan}
+          onToggle={(v) => toggle(perbaikanDiinginkan, setPerbaikanDiinginkan, v)}
+          teksLainnya={catatanPerbaikan}
+          onTeksLainnyaChange={setCatatanPerbaikan}
         />
       </div>
 

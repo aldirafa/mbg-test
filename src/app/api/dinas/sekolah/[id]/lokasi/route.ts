@@ -3,9 +3,16 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
+// Dipakai Dinas/Admin buat 2 hal sekaligus (digabung 1 endpoint krn sama-sama "profil
+// sekolah" & selalu diedit dari baris yang sama di SekolahLokasiManager): titik acuan
+// lokasi geo-fence CVI (lat/lng) & provinsi/kabupaten-kota teks bebas (feedback tim
+// 20 Sep, buat filter dashboard statistik Dinas). Semua field opsional per-request --
+// kirim cuma yang mau diubah.
 const bodySchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+  provinsi: z.string().optional(),
+  kabupatenKota: z.string().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,9 +32,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Sekolah tidak ditemukan" }, { status: 404 });
   }
 
+  const { lat, lng, provinsi, kabupatenKota } = parsed.data;
+
   const updated = await prisma.sekolah.update({
     where: { id },
-    data: { lat: parsed.data.lat, lng: parsed.data.lng },
+    data: {
+      ...(lat !== undefined ? { lat } : {}),
+      ...(lng !== undefined ? { lng } : {}),
+      ...(provinsi !== undefined ? { provinsi: provinsi || null } : {}),
+      ...(kabupatenKota !== undefined ? { kabupatenKota: kabupatenKota || null } : {}),
+    },
   });
 
   return NextResponse.json({ sekolah: updated });
