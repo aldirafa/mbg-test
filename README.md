@@ -144,6 +144,11 @@ diterima/ditindaklanjuti/selesai dan bisa dari sekolah maupun orangtua.
 
 Password semua akun seed sama, dicetak di terminal setelah `npm run db:seed`.
 
+Selain `orangtua@mbgdigital.test`, seed juga bikin 6 akun dummy orangtua tambahan buat
+testing tim peneliti (`orangtua1@` s.d. `orangtua6@mbgdigital.test`), masing-masing 1
+anak di SMAN 1 Garut dengan NIS/NISN `1234567891` s.d. `1234567896` -- lihat
+`prisma/seed.ts` buat daftar lengkap nama orangtua & anaknya.
+
 Fitur Fase 2 yang bisa langsung dites juga:
 
 5. Buka `/suara-anak` (gak perlu login) -> masukin NIS/NISN siswa seed
