@@ -134,6 +134,19 @@ async function main() {
     });
   }
 
+  // 6. Siswa tambahan tanpa akun orangtua -- buat uji coba Suara Anak ke ~8 anak
+  // (7 siswa di atas + 1 ini).
+  await prisma.siswa.upsert({
+    where: { nisNisn: "1234567897" },
+    update: {},
+    create: {
+      sekolahId: sekolah.id,
+      nama: "Putri",
+      nisNisn: "1234567897",
+      kelas: "X IPA 2",
+    },
+  });
+
   console.log("Seed selesai. Akun buat login (password sama semua):");
   console.log(`  Password: ${DEV_PASSWORD}`);
   console.log("  dinas@mbgdigital.test     (Dinas/Admin)");
@@ -143,6 +156,7 @@ async function main() {
   for (const d of orangtuaDummy) {
     console.log(`  ${d.email.padEnd(26)}(${d.nama}, anak: ${d.anak})`);
   }
+  console.log("NIS/NISN buat Suara Anak: 1234567890 s.d. 1234567897");
 }
 
 main()
