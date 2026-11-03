@@ -99,12 +99,50 @@ async function main() {
     },
   });
 
+  // 5. Akun dummy orangtua tambahan buat testing tim peneliti (permintaan Teh Lingga,
+  // 3 Nov) -- masing-masing 1 anak di SMAN 1 Garut.
+  const orangtuaDummy = [
+    { email: "orangtua1@mbgdigital.test", nama: "Ibu Rina", noWa: "0812-0000-0101", anak: "Aisyah", nisNisn: "1234567891", kelas: "X IPA 1" },
+    { email: "orangtua2@mbgdigital.test", nama: "Bapak Dedi", noWa: "0812-0000-0102", anak: "Rizky", nisNisn: "1234567892", kelas: "X IPS 2" },
+    { email: "orangtua3@mbgdigital.test", nama: "Ibu Yuni", noWa: "0812-0000-0103", anak: "Nayla", nisNisn: "1234567893", kelas: "XI IPA 1" },
+    { email: "orangtua4@mbgdigital.test", nama: "Bapak Asep", noWa: "0812-0000-0104", anak: "Fajar", nisNisn: "1234567894", kelas: "XI IPS 1" },
+    { email: "orangtua5@mbgdigital.test", nama: "Ibu Lilis", noWa: "0812-0000-0105", anak: "Salsa", nisNisn: "1234567895", kelas: "XII IPA 3" },
+    { email: "orangtua6@mbgdigital.test", nama: "Bapak Hendra", noWa: "0812-0000-0106", anak: "Dimas", nisNisn: "1234567896", kelas: "XII IPS 2" },
+  ];
+
+  for (const d of orangtuaDummy) {
+    const user = await prisma.user.upsert({
+      where: { email: d.email },
+      update: {},
+      create: { nama: d.nama, email: d.email, passwordHash, role: "orangtua" },
+    });
+    const ortu = await prisma.orangtua.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, nama: d.nama, noWa: d.noWa },
+    });
+    await prisma.siswa.upsert({
+      where: { nisNisn: d.nisNisn },
+      update: {},
+      create: {
+        sekolahId: sekolah.id,
+        nama: d.anak,
+        nisNisn: d.nisNisn,
+        kelas: d.kelas,
+        orangtuaId: ortu.id,
+      },
+    });
+  }
+
   console.log("Seed selesai. Akun buat login (password sama semua):");
   console.log(`  Password: ${DEV_PASSWORD}`);
   console.log("  dinas@mbgdigital.test     (Dinas/Admin)");
   console.log("  sppg@mbgdigital.test      (SPPG Melong Asih)");
   console.log("  sekolah@mbgdigital.test   (SMAN 1 Garut)");
   console.log("  orangtua@mbgdigital.test  (Ibu Siti, anak: Bilqis)");
+  for (const d of orangtuaDummy) {
+    console.log(`  ${d.email.padEnd(26)}(${d.nama}, anak: ${d.anak})`);
+  }
 }
 
 main()
