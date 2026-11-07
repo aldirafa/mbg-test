@@ -1,8 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/react";
-import { ChevronDownIcon } from "@heroicons/react/20/solid";
+import {
+  Badge,
+  Body1,
+  Button,
+  Caption1,
+  Skeleton,
+  SkeletonItem,
+  Spinner,
+  type BadgeProps,
+} from "@fluentui/react-components";
+import { ArrowRightRegular, ChatWarningRegular, CheckmarkRegular } from "@fluentui/react-icons";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { formatTanggalPendek } from "@/lib/format";
 
 type PengaduanItem = {
   id: string;
@@ -14,22 +26,18 @@ type PengaduanItem = {
   sppg?: { namaSppg: string } | null;
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  diterima: "bg-amber-100 text-amber-700",
-  ditindaklanjuti: "bg-blue-100 text-blue-700",
-  selesai: "bg-green-100 text-green-700",
-};
-const STATUS_LABEL: Record<string, string> = {
-  diterima: "Diterima",
-  ditindaklanjuti: "Ditindaklanjuti",
-  selesai: "Selesai",
+const STATUS: Record<string, { label: string; color: BadgeProps["color"] }> = {
+  diterima: { label: "Diterima", color: "warning" },
+  ditindaklanjuti: { label: "Ditindaklanjuti", color: "informative" },
+  selesai: { label: "Selesai", color: "success" },
 };
 const NEXT_LABEL: Record<string, string> = {
   diterima: "Tandai Ditindaklanjuti",
   ditindaklanjuti: "Tandai Selesai",
 };
 
-function PengaduanContent({ open }: { open: boolean }) {
+// Mount = panel dibuka (AccordionPanel cuma render isi saat terbuka) -> lazy-fetch.
+function PengaduanContent() {
   const [list, setList] = useState<PengaduanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -41,8 +49,8 @@ function PengaduanContent({ open }: { open: boolean }) {
   }
 
   useEffect(() => {
-    if (open) load().finally(() => setLoading(false));
-  }, [open]);
+    load().finally(() => setLoading(false));
+  }, []);
 
   async function advance(p: PengaduanItem) {
     setBusyId(p.id);
@@ -51,53 +59,62 @@ function PengaduanContent({ open }: { open: boolean }) {
     setBusyId(null);
   }
 
+  if (loading)
+    return (
+      <Skeleton aria-label="Memuat pengaduan" className="flex flex-col gap-2">
+        <SkeletonItem size={20} />
+        <SkeletonItem size={20} />
+        <SkeletonItem size={20} />
+      </Skeleton>
+    );
+  if (list.length === 0) return <EmptyState icon={<ChatWarningRegular />} title="Belum ada pengaduan" />;
+
   return (
-    <div className="space-y-3">
-      {loading && <p className="text-xs text-neutral-500">Memuat...</p>}
-      {!loading && list.length === 0 && <p className="text-xs text-neutral-500">Belum ada pengaduan.</p>}
-      {list.map((p) => (
-        <div key={p.id} className="border-t border-neutral-200 pt-3 first:border-t-0 first:pt-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="text-xs text-neutral-500">
-              {p.sekolah?.namaSekolah ?? p.orangtua?.nama ?? "?"} &rarr; {p.sppg?.namaSppg ?? "?"}
+    <ul className="flex flex-col divide-y divide-stroke2">
+      {list.map((p) => {
+        const st = STATUS[p.status] ?? { label: p.status, color: "informative" as const };
+        return (
+          <li key={p.id} className="flex flex-col gap-1.5 py-3 first:pt-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Caption1 className="inline-flex items-center gap-1 text-fg3">
+                {p.sekolah?.namaSekolah ?? p.orangtua?.nama ?? "?"} <ArrowRightRegular /> {p.sppg?.namaSppg ?? "?"}
+                <span aria-hidden> · </span>
+                {formatTanggalPendek(p.createdAt)}
+              </Caption1>
+              <Badge appearance="tint" color={st.color} shape="rounded">
+                {st.label}
+              </Badge>
             </div>
-            <span className={"text-xs rounded-full px-2 py-0.5 " + (STATUS_BADGE[p.status] ?? "")}>
-              {STATUS_LABEL[p.status] ?? p.status}
-            </span>
-          </div>
-          <p className="text-sm mt-1">{p.isi}</p>
-          {NEXT_LABEL[p.status] && (
-            <button
-              disabled={busyId === p.id}
-              onClick={() => advance(p)}
-              className="cursor-pointer mt-2 rounded-md border border-neutral-300 px-3 py-1.5 text-xs disabled:opacity-60"
-            >
-              {busyId === p.id ? "Menyimpan..." : NEXT_LABEL[p.status]}
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
+            <Body1 className="break-words">{p.isi}</Body1>
+            {NEXT_LABEL[p.status] && (
+              <div>
+                <Button
+                  size="small"
+                  disabled={busyId === p.id}
+                  onClick={() => advance(p)}
+                  icon={busyId === p.id ? <Spinner size="extra-tiny" /> : <CheckmarkRegular />}
+                >
+                  {busyId === p.id ? "Menyimpan..." : NEXT_LABEL[p.status]}
+                </Button>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
 // Dinas/Admin kelola status semua pengaduan (Fase 2, Bagian 6.5) -- diterima ->
-// ditindaklanjuti -> selesai, linear sama kayak flag triangulasi. Pakai Headless UI
-// Disclosure (ganti toggle manual) tapi tetep lazy-fetch cuma pas dibuka.
+// ditindaklanjuti -> selesai, linear sama kayak flag triangulasi. Lazy-fetch saat dibuka.
 export function PengaduanManager() {
   return (
-    <Disclosure as="div" className="border border-neutral-200 rounded-lg p-4 text-sm">
-      {({ open }) => (
-        <>
-          <DisclosureButton className="cursor-pointer flex items-center gap-1.5 font-medium text-sm">
-            <ChevronDownIcon className={`size-4 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
-            {open ? "Sembunyikan" : "Kelola"} Pengaduan
-          </DisclosureButton>
-          <DisclosurePanel className="mt-3">
-            <PengaduanContent open={open} />
-          </DisclosurePanel>
-        </>
-      )}
-    </Disclosure>
+    <CollapsibleCard
+      title="Kelola Pengaduan"
+      description="Diterima → Ditindaklanjuti → Selesai"
+      icon={<ChatWarningRegular />}
+    >
+      <PengaduanContent />
+    </CollapsibleCard>
   );
 }

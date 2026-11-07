@@ -1,6 +1,7 @@
 "use client";
 
-import { badgeClassForStatus } from "@/components/ui/expandable";
+import { Caption1, Text } from "@fluentui/react-components";
+import { TrafficBadge } from "@/components/ui/expandable";
 import { formatAngkaID } from "@/lib/format";
 import { evaluasiGizi, LABEL_STATUS_GIZI, type TotalGiziSiklus, type JenjangBgn } from "@/lib/bgn";
 
@@ -31,6 +32,17 @@ export function ringkasanPerSiklus(items: ItemGiziLike[]): [number, TotalGiziSik
   return [...map.entries()].sort((a, b) => a[0] - b[0]);
 }
 
+function Nilai({ label, value, unit }: { label: string; value: number; unit: string }) {
+  return (
+    <div className="flex flex-col">
+      <Caption1 className="text-fg3">{label}</Caption1>
+      <Text weight="semibold" className="tabular-nums">
+        {formatAngkaID(value)} <Caption1 className="text-fg3">{unit}</Caption1>
+      </Text>
+    </div>
+  );
+}
+
 // Ringkasan gizi per siklus + badge evaluasi BGN (hijau/kuning/merah, SMA aja utk
 // sekarang -- lihat src/lib/bgn.ts).
 export function RingkasanGiziSiklus({
@@ -46,34 +58,36 @@ export function RingkasanGiziSiklus({
   if (perSiklus.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-neutral-600">Ringkasan gizi per siklus</p>
-      {perSiklus.map(([siklus, total]) => {
-        const hasil =
-          jenjang && (untukWaktu === "pagi" || untukWaktu === "siang") ? evaluasiGizi(total, jenjang, untukWaktu) : null;
-        return (
-          <div key={siklus} className="rounded-md border border-neutral-200 p-2.5 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-neutral-800">Siklus {siklus}</span>
-              {hasil ? (
-                <span className={badgeClassForStatus(hasil.status)}>{LABEL_STATUS_GIZI[hasil.status]}</span>
-              ) : (
-                <span className="text-neutral-400">Belum ada standar evaluasi</span>
-              )}
+    <div className="flex flex-col gap-2">
+      <Caption1 className="font-semibold text-fg2">Ringkasan gizi per siklus</Caption1>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {perSiklus.map(([siklus, total]) => {
+          const hasil =
+            jenjang && (untukWaktu === "pagi" || untukWaktu === "siang") ? evaluasiGizi(total, jenjang, untukWaktu) : null;
+          return (
+            <div key={siklus} className="rounded-fluent-m border border-stroke2 bg-bg2 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Text weight="semibold">Siklus {siklus}</Text>
+                {hasil ? (
+                  <TrafficBadge status={hasil.status}>{LABEL_STATUS_GIZI[hasil.status]}</TrafficBadge>
+                ) : (
+                  <Caption1 className="text-fg3">Belum ada standar evaluasi</Caption1>
+                )}
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <Nilai label="Energi" value={total.energi} unit="kkal" />
+                <Nilai label="Protein" value={total.proteinHewani + total.proteinNabati} unit="g" />
+                <Nilai label="Lemak" value={total.lemak} unit="g" />
+                <Nilai label="Karbo" value={total.karbohidrat} unit="g" />
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-neutral-500 mt-1.5">
-              <span>Energi: {formatAngkaID(total.energi)} kkal</span>
-              <span>Protein: {formatAngkaID(total.proteinHewani + total.proteinNabati)} g</span>
-              <span>Lemak: {formatAngkaID(total.lemak)} g</span>
-              <span>Karbohidrat: {formatAngkaID(total.karbohidrat)} g</span>
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
       {jenjang && jenjang !== "SMA" && (
-        <p className="text-xs text-neutral-400">
+        <Caption1 className="text-fg3">
           Evaluasi BGN baru tersedia utk jenjang SMA. Sekolah ini jenjang {jenjang}, belum ada standar.
-        </p>
+        </Caption1>
       )}
     </div>
   );

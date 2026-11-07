@@ -2,8 +2,35 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import {
+  Body1,
+  Button,
+  Caption1,
+  Divider,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  ProgressBar,
+  Radio,
+  RadioGroup,
+  Skeleton,
+  SkeletonItem,
+  Spinner,
+  Subtitle2,
+  Text,
+  Textarea,
+} from "@fluentui/react-components";
+import {
+  CheckmarkCircleFilled,
+  CircleRegular,
+  DocumentSignatureRegular,
+  PhoneRegular,
+  SendRegular,
+} from "@fluentui/react-icons";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { LabeledCheckbox } from "@/components/ui/checkbox";
+import { SectionCard } from "@/components/ui/section-card";
 
 // Formulir persetujuan orang tua (feedback tim Prof Elly, 20 Sep, dari screenshot
 // "FORMULIR PERSETUJUAN PROGRAM MAKAN BERGIZI GRATIS") -- gate SEBELUM orang tua bisa
@@ -49,9 +76,13 @@ export function PersetujuanOrangtuaGate({ children }: { children: ReactNode }) {
   if (step === "loading") {
     return (
       <DashboardShell title="Portal Orang Tua">
-        <main className="max-w-lg mx-auto p-6">
-          <p className="text-sm text-neutral-500">Memuat...</p>
-        </main>
+        <SectionCard>
+          <Skeleton aria-label="Memuat" className="flex flex-col gap-3">
+            <SkeletonItem size={24} />
+            <SkeletonItem size={64} />
+            <SkeletonItem size={64} />
+          </Skeleton>
+        </SectionCard>
       </DashboardShell>
     );
   }
@@ -59,9 +90,9 @@ export function PersetujuanOrangtuaGate({ children }: { children: ReactNode }) {
   if (step === "error") {
     return (
       <DashboardShell title="Portal Orang Tua">
-        <main className="max-w-lg mx-auto p-6">
-          <p className="text-sm text-red-600">{errorMsg}</p>
-        </main>
+        <MessageBar layout="multiline" intent="error">
+          <MessageBarBody>{errorMsg}</MessageBarBody>
+        </MessageBar>
       </DashboardShell>
     );
   }
@@ -82,20 +113,39 @@ export function PersetujuanOrangtuaGate({ children }: { children: ReactNode }) {
 
   return (
     <DashboardShell title="Portal Orang Tua" subtitle="Formulir Persetujuan Program Makan Bergizi Gratis">
-      <main className="max-w-lg mx-auto p-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
         {totalAnak > 1 && (
-          <p className="text-xs text-neutral-500 mb-4">
-            {totalAnak - totalBelum + 1} dari {totalAnak} anak &middot; isi formulir untuk tiap anak sebelum bisa
-            mengakses dashboard.
-          </p>
+          <SectionCard>
+            <div className="flex flex-col gap-2">
+              <Text weight="semibold">
+                Anak {totalAnak - totalBelum + 1} dari {totalAnak}
+              </Text>
+              <ProgressBar value={(totalAnak - totalBelum) / totalAnak} thickness="large" />
+              <Caption1 className="text-fg3">Isi formulir untuk tiap anak sebelum bisa mengakses dashboard.</Caption1>
+            </div>
+          </SectionCard>
         )}
-        <SatuFormulirAnak
-          key={anakBerikutnya.siswa.id}
-          child={anakBerikutnya}
-          onSelesai={() => load()}
-        />
-      </main>
+        <SatuFormulirAnak key={anakBerikutnya.siswa.id} child={anakBerikutnya} onSelesai={() => load()} />
+      </div>
     </DashboardShell>
+  );
+}
+
+function Bagian({ huruf, judul, selesai, children }: { huruf: string; judul: string; selesai: boolean; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        {selesai ? (
+          <CheckmarkCircleFilled className="text-[20px] text-success" aria-label="Lengkap" />
+        ) : (
+          <CircleRegular className="text-[20px] text-fg4" aria-label="Belum lengkap" />
+        )}
+        <Subtitle2 as="h3">
+          {huruf}. {judul}
+        </Subtitle2>
+      </div>
+      <div className="flex flex-col gap-3 sm:pl-7">{children}</div>
+    </section>
   );
 }
 
@@ -144,125 +194,131 @@ function SatuFormulirAnak({ child, onSelesai }: { child: ChildPersetujuan; onSel
     }
   }
 
-  return (
-    <div className="border border-neutral-200 rounded-lg overflow-hidden">
-      <div className="p-4 space-y-6">
-        <div>
-          <h2 className="font-semibold">Formulir Persetujuan Program Makan Bergizi Gratis</h2>
-          <p className="text-xs text-neutral-500 mt-1">
-            Mohon diisi sebelum bisa menggunakan fitur harian aplikasi untuk anak ini.
-          </p>
-        </div>
+  const bagianA = noHpOrangTua.trim().length > 0;
+  const bagianB = bersedia !== null && (bersedia || alasanTidakBersedia.trim().length > 0);
+  const bagianC = adaAlergi !== null && (!adaAlergi || jenisAlergi.trim().length > 0);
+  const bagianD = setujuTandaTangan && namaTandaTangan.trim().length > 0;
 
+  return (
+    <SectionCard
+      icon={<DocumentSignatureRegular />}
+      title="Formulir Persetujuan Program Makan Bergizi Gratis"
+      description="Mohon diisi sebelum bisa menggunakan fitur harian aplikasi untuk anak ini."
+    >
+      <div className="flex flex-col gap-6">
         {/* A. Identitas Siswa */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">A. Identitas Siswa</p>
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
-            <dt className="text-neutral-500">Nama Siswa</dt>
-            <dd className="font-medium">{child.siswa.nama}</dd>
-            <dt className="text-neutral-500">Kelas</dt>
-            <dd className="font-medium">{child.siswa.kelas || "-"}</dd>
-            <dt className="text-neutral-500">Sekolah</dt>
-            <dd className="font-medium">{child.siswa.namaSekolah}</dd>
-            <dt className="text-neutral-500">Nama Orang Tua/Wali</dt>
-            <dd className="font-medium">{child.orangtua.nama}</dd>
+        <Bagian huruf="A" judul="Identitas Siswa" selesai={bagianA}>
+          <dl className="grid grid-cols-1 gap-x-4 gap-y-2 rounded-fluent-m bg-bg2 p-3 sm:grid-cols-[auto_1fr]">
+            {[
+              ["Nama Siswa", child.siswa.nama],
+              ["Kelas", child.siswa.kelas || "-"],
+              ["Sekolah", child.siswa.namaSekolah],
+              ["Nama Orang Tua/Wali", child.orangtua.nama],
+            ].map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt>
+                  <Caption1 className="text-fg3">{k}</Caption1>
+                </dt>
+                <dd>
+                  <Body1 className="font-semibold">{v}</Body1>
+                </dd>
+              </div>
+            ))}
           </dl>
-          <div className="pt-1">
-            <label className="text-sm font-medium">Nomor HP Orang Tua</label>
-            <input
+          <Field label="Nomor HP Orang Tua" required>
+            <Input
+              type="tel"
+              inputMode="tel"
               value={noHpOrangTua}
-              onChange={(e) => setNoHpOrangTua(e.target.value)}
+              onChange={(_, d) => setNoHpOrangTua(d.value)}
               placeholder="08xxxxxxxxxx"
-              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              contentBefore={<PhoneRegular />}
             />
-          </div>
-        </div>
+          </Field>
+        </Bagian>
+
+        <Divider />
 
         {/* B. Kesediaan Mengikuti Program */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-            B. Kesediaan Mengikuti Program
-          </p>
-          <div className="space-y-2">
-            <LabeledCheckbox
-              checked={bersedia === true}
-              onChange={(v) => setBersedia(v ? true : bersedia === true ? null : bersedia)}
-              label="Bersedia mengikutsertakan anak dalam Program Makan Bergizi Gratis"
-            />
-            <LabeledCheckbox
-              checked={bersedia === false}
-              onChange={(v) => setBersedia(v ? false : bersedia === false ? null : bersedia)}
-              label="Tidak bersedia"
-            />
-          </div>
+        <Bagian huruf="B" judul="Kesediaan Mengikuti Program" selesai={bagianB}>
+          <RadioGroup
+            value={bersedia === null ? "" : bersedia ? "ya" : "tidak"}
+            onChange={(_, d) => setBersedia(d.value === "ya")}
+            aria-label="Kesediaan mengikuti program"
+          >
+            <Radio value="ya" label="Bersedia mengikutsertakan anak dalam Program Makan Bergizi Gratis" />
+            <Radio value="tidak" label="Tidak bersedia" />
+          </RadioGroup>
           {bersedia === false && (
-            <textarea
-              value={alasanTidakBersedia}
-              onChange={(e) => setAlasanTidakBersedia(e.target.value)}
-              placeholder="Alasan tidak bersedia..."
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm min-h-16"
-            />
+            <Field label="Alasan tidak bersedia" required>
+              <Textarea
+                resize="vertical"
+                value={alasanTidakBersedia}
+                onChange={(_, d) => setAlasanTidakBersedia(d.value)}
+                placeholder="Alasan tidak bersedia..."
+              />
+            </Field>
           )}
-        </div>
+        </Bagian>
+
+        <Divider />
 
         {/* C. Informasi Alergi Makanan */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-            C. Informasi Alergi Makanan
-          </p>
-          <div className="space-y-2">
-            <LabeledCheckbox
-              checked={adaAlergi === true}
-              onChange={(v) => setAdaAlergi(v ? true : adaAlergi === true ? null : adaAlergi)}
-              label="Ya, ada alergi/pantangan makanan"
-            />
-            <LabeledCheckbox
-              checked={adaAlergi === false}
-              onChange={(v) => setAdaAlergi(v ? false : adaAlergi === false ? null : adaAlergi)}
-              label="Tidak ada"
-            />
-          </div>
+        <Bagian huruf="C" judul="Informasi Alergi Makanan" selesai={bagianC}>
+          <RadioGroup
+            value={adaAlergi === null ? "" : adaAlergi ? "ya" : "tidak"}
+            onChange={(_, d) => setAdaAlergi(d.value === "ya")}
+            aria-label="Informasi alergi makanan"
+          >
+            <Radio value="ya" label="Ya, ada alergi/pantangan makanan" />
+            <Radio value="tidak" label="Tidak ada" />
+          </RadioGroup>
           {adaAlergi === true && (
-            <textarea
-              value={jenisAlergi}
-              onChange={(e) => setJenisAlergi(e.target.value)}
-              placeholder="Sebutkan jenis alergi/pantangannya..."
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm min-h-16"
-            />
+            <Field label="Jenis alergi/pantangan" required>
+              <Textarea
+                resize="vertical"
+                value={jenisAlergi}
+                onChange={(_, d) => setJenisAlergi(d.value)}
+                placeholder="Sebutkan jenis alergi/pantangannya..."
+              />
+            </Field>
           )}
-        </div>
+        </Bagian>
+
+        <Divider />
 
         {/* D. Tanda Tangan Persetujuan */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-            D. Tanda Tangan Persetujuan
-          </p>
+        <Bagian huruf="D" judul="Tanda Tangan Persetujuan" selesai={bagianD}>
           <LabeledCheckbox
             checked={setujuTandaTangan}
             onChange={setSetujuTandaTangan}
             label="Saya menyatakan data di atas benar dan menyetujui formulir ini sebagai pengganti tanda tangan basah."
           />
-          <div>
-            <label className="text-sm font-medium">Nama Lengkap (sebagai tanda tangan digital)</label>
-            <input
+          <Field label="Nama Lengkap (sebagai tanda tangan digital)" required>
+            <Input
               value={namaTandaTangan}
-              onChange={(e) => setNamaTandaTangan(e.target.value)}
+              onChange={(_, d) => setNamaTandaTangan(d.value)}
               placeholder="Ketik nama lengkap Anda"
-              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
             />
-          </div>
-        </div>
+          </Field>
+        </Bagian>
 
-        {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
+        {errorMsg && (
+          <MessageBar layout="multiline" intent="error">
+            <MessageBarBody>{errorMsg}</MessageBarBody>
+          </MessageBar>
+        )}
 
-        <button
+        <Button
+          appearance="primary"
+          size="large"
           disabled={!bisaKirim || busy}
           onClick={submit}
-          className="cursor-pointer w-full rounded-md bg-neutral-900 text-white text-sm font-medium py-2.5 disabled:opacity-60 disabled:cursor-not-allowed"
+          icon={busy ? <Spinner size="tiny" /> : <SendRegular />}
         >
           {busy ? "Mengirim..." : "Kirim Persetujuan"}
-        </button>
+        </Button>
       </div>
-    </div>
+    </SectionCard>
   );
 }

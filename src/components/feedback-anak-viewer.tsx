@@ -1,8 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/react";
-import { ChevronDownIcon } from "@heroicons/react/20/solid";
+import { Badge, Body1, Caption1, Skeleton, SkeletonItem, Text } from "@fluentui/react-components";
+import {
+  ChatBubblesQuestionRegular,
+  EmojiRegular,
+  FoodRegular,
+  LocationRegular,
+  WarningRegular,
+} from "@fluentui/react-icons";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { StatTile } from "@/components/ui/stat-tile";
+import { formatTanggalPendek } from "@/lib/format";
 import {
   OPSI_PENILAIAN,
   OPSI_ALASAN_SUKA,
@@ -40,23 +50,29 @@ function labelDari(opsi: OpsiSuaraAnak[], value: string | null): string | null {
 }
 
 function labelDaftar(opsi: OpsiSuaraAnak[], values: string[]): string {
-  return values
-    .map((v) => opsi.find((o) => o.value === v)?.label ?? v)
-    .join(", ");
+  return values.map((v) => opsi.find((o) => o.value === v)?.label ?? v).join(", ");
 }
 
-function FeedbackAnakContent({ open }: { open: boolean }) {
+function Baris({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:gap-2">
+      <Caption1 className="shrink-0 text-fg3 sm:w-36">{label}</Caption1>
+      <Caption1 className="text-fg2">{children}</Caption1>
+    </div>
+  );
+}
+
+// Mount = panel dibuka -> lazy-fetch.
+function FeedbackAnakContent() {
   const [list, setList] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (open) {
-      fetch("/api/dinas/feedback-anak")
-        .then((r) => r.json())
-        .then((d) => setList(d.feedback ?? []))
-        .finally(() => setLoading(false));
-    }
-  }, [open]);
+    fetch("/api/dinas/feedback-anak")
+      .then((r) => r.json())
+      .then((d) => setList(d.feedback ?? []))
+      .finally(() => setLoading(false));
+  }, []);
 
   // Data lama (sebelum revisi 20 Sep) gak punya `penilaian`/`kondisiHabis` -- fallback
   // ke boolean suka/habis legacy buat hitung ringkasan & tampilan per-baris.
@@ -64,81 +80,104 @@ function FeedbackAnakContent({ open }: { open: boolean }) {
   const totalHabis = list.filter((f) => (f.kondisiHabis ? f.kondisiHabis === "habis" : f.habis)).length;
   const belumTerverifikasi = list.filter((f) => !f.lokasiTerverifikasi).length;
 
-  return (
-    <div className="space-y-3">
-      {loading && <p className="text-xs text-neutral-500">Memuat...</p>}
-      {!loading && list.length === 0 && <p className="text-xs text-neutral-500">Belum ada feedback masuk.</p>}
-      {!loading && list.length > 0 && (
-        <>
-          <p className="text-xs text-neutral-500">
-            {totalSuka}/{list.length} suka menunya &middot; {totalHabis}/{list.length} habis
-            {belumTerverifikasi > 0 && <> &middot; {belumTerverifikasi} lokasi belum terverifikasi (perlu ditinjau manual)</>}
-          </p>
-          <div className="space-y-2">
-            {list.map((f) => {
-              const penilaianLabel = labelDari(OPSI_PENILAIAN, f.penilaian) ?? (f.suka ? "😋 Suka (data lama)" : "😕 Kurang suka (data lama)");
-              const kondisiHabisLabel =
-                labelDari(OPSI_KONDISI_HABIS, f.kondisiHabis) ?? (f.habis ? "🍽️ Habis (data lama)" : "🥡 Tidak habis (data lama)");
-              const kondisiKemasanLabel = labelDari(OPSI_KONDISI_KEMASAN, f.kondisiKemasan);
+  if (loading)
+    return (
+      <Skeleton aria-label="Memuat feedback" className="flex flex-col gap-2">
+        <SkeletonItem size={48} />
+        <SkeletonItem size={20} />
+        <SkeletonItem size={20} />
+      </Skeleton>
+    );
+  if (list.length === 0) return <EmptyState icon={<ChatBubblesQuestionRegular />} title="Belum ada feedback masuk" />;
 
-              return (
-                <div key={f.id} className="border-t border-neutral-200 pt-2 first:border-t-0 first:pt-0 text-xs space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{f.siswa ? `${f.siswa.nama} (${f.siswa.nisNisn})` : f.sekolah.namaSekolah}</span>
-                    <span className="text-neutral-400">{!f.lokasiTerverifikasi && "⚠️ lokasi belum terverifikasi"}</span>
-                  </div>
-                  <p className="text-neutral-600">
-                    {penilaianLabel} &middot; {kondisiHabisLabel}
-                    {kondisiKemasanLabel && <> &middot; Kemasan: {kondisiKemasanLabel}</>}
-                  </p>
-                  {f.alasanSuka.length > 0 && (
-                    <p className="text-neutral-500">Suka karena: {labelDaftar(OPSI_ALASAN_SUKA, f.alasanSuka)}</p>
-                  )}
-                  {f.alasanKurangSuka.length > 0 && (
-                    <p className="text-neutral-500">
-                      Kurang suka karena: {labelDaftar(OPSI_ALASAN_KURANG_SUKA, f.alasanKurangSuka)}
-                      {f.alasanKurangSukaLainnya && <> ({f.alasanKurangSukaLainnya})</>}
-                    </p>
-                  )}
-                  {f.alasanTidakHabis.length > 0 && (
-                    <p className="text-neutral-500">
-                      Gak habis karena: {labelDaftar(OPSI_ALASAN_TIDAK_HABIS, f.alasanTidakHabis)}
-                      {f.alasanTidakHabisLainnya && <> ({f.alasanTidakHabisLainnya})</>}
-                    </p>
-                  )}
-                  {f.perbaikanDiinginkan.length > 0 && (
-                    <p className="text-neutral-500">Ingin diperbaiki: {labelDaftar(OPSI_PERBAIKAN, f.perbaikanDiinginkan)}</p>
-                  )}
-                  {f.catatanPerbaikan && f.perbaikanDiinginkan.length === 0 && (
-                    <p className="text-neutral-600">{f.catatanPerbaikan}</p>
-                  )}
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile label="Suka menunya" value={`${totalSuka}/${list.length}`} icon={<EmojiRegular />} tone="success" />
+        <StatTile label="Makanan habis" value={`${totalHabis}/${list.length}`} icon={<FoodRegular />} tone="brand" />
+        <StatTile
+          label="Lokasi belum terverifikasi"
+          value={belumTerverifikasi}
+          hint={belumTerverifikasi > 0 ? "Perlu ditinjau manual" : undefined}
+          icon={<LocationRegular />}
+          tone={belumTerverifikasi > 0 ? "warning" : "neutral"}
+        />
+      </div>
+      <ul className="flex flex-col divide-y divide-stroke2">
+        {list.map((f) => {
+          const penilaianLabel =
+            labelDari(OPSI_PENILAIAN, f.penilaian) ?? (f.suka ? "😋 Suka (data lama)" : "😕 Kurang suka (data lama)");
+          const kondisiHabisLabel =
+            labelDari(OPSI_KONDISI_HABIS, f.kondisiHabis) ??
+            (f.habis ? "🍽️ Habis (data lama)" : "🥡 Tidak habis (data lama)");
+          const kondisiKemasanLabel = labelDari(OPSI_KONDISI_KEMASAN, f.kondisiKemasan);
+
+          return (
+            <li key={f.id} className="flex flex-col gap-1.5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-col">
+                  <Text weight="semibold" className="block! truncate">
+                    {f.siswa ? `${f.siswa.nama} (${f.siswa.nisNisn})` : f.sekolah.namaSekolah}
+                  </Text>
+                  <Caption1 className="text-fg3">{formatTanggalPendek(f.createdAt)}</Caption1>
                 </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+                {!f.lokasiTerverifikasi && (
+                  <Badge appearance="tint" color="warning" icon={<WarningRegular />}>
+                    Lokasi belum terverifikasi
+                  </Badge>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <Badge appearance="outline" color="brand">
+                  {penilaianLabel}
+                </Badge>
+                <Badge appearance="outline" color="informative">
+                  {kondisiHabisLabel}
+                </Badge>
+                {kondisiKemasanLabel && (
+                  <Badge appearance="outline" color="subtle">
+                    Kemasan: {kondisiKemasanLabel}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {f.alasanSuka.length > 0 && <Baris label="Suka karena">{labelDaftar(OPSI_ALASAN_SUKA, f.alasanSuka)}</Baris>}
+                {f.alasanKurangSuka.length > 0 && (
+                  <Baris label="Kurang suka karena">
+                    {labelDaftar(OPSI_ALASAN_KURANG_SUKA, f.alasanKurangSuka)}
+                    {f.alasanKurangSukaLainnya && <> ({f.alasanKurangSukaLainnya})</>}
+                  </Baris>
+                )}
+                {f.alasanTidakHabis.length > 0 && (
+                  <Baris label="Gak habis karena">
+                    {labelDaftar(OPSI_ALASAN_TIDAK_HABIS, f.alasanTidakHabis)}
+                    {f.alasanTidakHabisLainnya && <> ({f.alasanTidakHabisLainnya})</>}
+                  </Baris>
+                )}
+                {f.perbaikanDiinginkan.length > 0 && (
+                  <Baris label="Ingin diperbaiki">{labelDaftar(OPSI_PERBAIKAN, f.perbaikanDiinginkan)}</Baris>
+                )}
+              </div>
+              {f.catatanPerbaikan && f.perbaikanDiinginkan.length === 0 && <Body1>{f.catatanPerbaikan}</Body1>}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
 
 // Dinas/Admin lihat feedback Suara Anak (CVI, Fase 2). Identitas siswa (nama/NIS-NISN)
 // cuma kebawa kalau API-nya ngebalikin (role admin) -- lihat src/app/api/dinas/feedback-anak.
-// Pakai Headless UI Disclosure (ganti toggle manual) tapi tetep lazy-fetch cuma pas dibuka.
+// Lazy-fetch cuma pas dibuka.
 export function FeedbackAnakViewer() {
   return (
-    <Disclosure as="div" className="border border-neutral-200 rounded-lg p-4 text-sm">
-      {({ open }) => (
-        <>
-          <DisclosureButton className="cursor-pointer flex items-center gap-1.5 font-medium text-sm">
-            <ChevronDownIcon className={`size-4 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
-            {open ? "Sembunyikan" : "Lihat"} Feedback Suara Anak (CVI)
-          </DisclosureButton>
-          <DisclosurePanel className="mt-3">
-            <FeedbackAnakContent open={open} />
-          </DisclosurePanel>
-        </>
-      )}
-    </Disclosure>
+    <CollapsibleCard
+      title="Feedback Suara Anak (CVI)"
+      description="Masukan langsung siswa dari formulir Suara Anak"
+      icon={<ChatBubblesQuestionRegular />}
+    >
+      <FeedbackAnakContent />
+    </CollapsibleCard>
   );
 }

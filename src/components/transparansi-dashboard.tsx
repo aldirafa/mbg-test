@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ComponentType } from "react";
+import { Caption1, Skeleton, SkeletonItem } from "@fluentui/react-components";
 import {
-  BuildingOffice2Icon,
-  AcademicCapIcon,
-  ClipboardDocumentCheckIcon,
-  UserGroupIcon,
-  HeartIcon,
-  StarIcon,
-} from "@heroicons/react/24/outline";
+  BuildingFactoryRegular,
+  ClipboardTaskListLtrRegular,
+  HatGraduationRegular,
+  HeartRegular,
+  PeopleCommunityRegular,
+  ShieldCheckmarkRegular,
+  StarRegular,
+} from "@fluentui/react-icons";
+import { PublicShell } from "@/components/public-shell";
+import { StatTile } from "@/components/ui/stat-tile";
 
 type Stats = {
   sppgAktif: number;
@@ -20,6 +23,7 @@ type Stats = {
   kepuasanKeseluruhan: number | null;
 };
 
+// Snapshot kondisi sekarang (belum ada data historis buat indikator naik/turun).
 export function TransparansiDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
 
@@ -30,67 +34,49 @@ export function TransparansiDashboard() {
   }, []);
 
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Transparansi MBG Digital</h1>
-        <p className="text-sm text-neutral-500 mt-1">
-          Data agregat program Makan Bergizi Gratis -- diperbarui otomatis, tanpa data pribadi.
-        </p>
-      </div>
-
-      {!stats && <p className="text-sm text-neutral-500">Memuat...</p>}
+    <PublicShell
+      title="Transparansi MBG Digital"
+      subtitle="Data agregat program Makan Bergizi Gratis, diperbarui otomatis, tanpa data pribadi."
+    >
+      {!stats && (
+        <Skeleton aria-label="Memuat statistik" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <SkeletonItem key={i} size={96} shape="rectangle" />
+          ))}
+        </Skeleton>
+      )}
 
       {stats && (
-        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <StatCard icon={BuildingOffice2Icon} label="SPPG Aktif" value={String(stats.sppgAktif)} />
-          <StatCard icon={AcademicCapIcon} label="Sekolah Terhubung" value={String(stats.totalSekolah)} />
-          <StatCard
-            icon={ClipboardDocumentCheckIcon}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <StatTile icon={<BuildingFactoryRegular />} label="SPPG Aktif" value={stats.sppgAktif} />
+          <StatTile icon={<HatGraduationRegular />} label="Sekolah Terhubung" value={stats.totalSekolah} />
+          <StatTile
+            icon={<ClipboardTaskListLtrRegular />}
             label="Konsistensi Pelaporan Sekolah"
             value={stats.konsistensiPelaporanPersen != null ? `${stats.konsistensiPelaporanPersen}%` : "-"}
           />
-          <StatCard
-            icon={UserGroupIcon}
-            label="Partisipasi Orangtua"
+          <StatTile
+            icon={<PeopleCommunityRegular />}
+            label="Partisipasi Orang Tua"
             value={stats.partisipasiOrangtuaPersen != null ? `${stats.partisipasiOrangtuaPersen}%` : "-"}
           />
-          <StatCard
-            icon={HeartIcon}
-            label="Kepuasan Orangtua"
-            value={stats.kepuasanOrangtua != null ? `⭐ ${stats.kepuasanOrangtua.toFixed(1)}` : "-"}
+          <StatTile
+            icon={<HeartRegular />}
+            tone="warning"
+            label="Kepuasan Orang Tua"
+            value={stats.kepuasanOrangtua != null ? `${stats.kepuasanOrangtua.toFixed(1)} / 5` : "-"}
           />
-          <StatCard
-            icon={StarIcon}
+          <StatTile
+            icon={<StarRegular />}
+            tone="warning"
             label="Kepuasan Keseluruhan"
-            value={stats.kepuasanKeseluruhan != null ? `⭐ ${stats.kepuasanKeseluruhan.toFixed(1)}` : "-"}
+            value={stats.kepuasanKeseluruhan != null ? `${stats.kepuasanKeseluruhan.toFixed(1)} / 5` : "-"}
           />
-        </dl>
-      )}
-    </main>
-  );
-}
-
-// Kartu statistik gaya "icon badge" (terinspirasi contoh Tailwind Plus yang dikasih user),
-// diadaptasi ke tema neutral/hitam aplikasi ini -- gak pakai indikator naik/turun karena
-// belum ada data historis buat dibandingin (cuma snapshot kondisi sekarang).
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-lg border border-neutral-200 px-4 pt-5 pb-4 sm:px-6 sm:pt-6">
-      <div>
-        <div className="absolute rounded-md bg-neutral-900 p-3">
-          <Icon className="size-6 text-white" />
         </div>
-        <p className="ml-16 truncate text-sm font-medium text-neutral-500">{label}</p>
-      </div>
-      <p className="ml-16 mt-1 text-2xl font-semibold text-neutral-900">{value}</p>
-    </div>
+      )}
+      <Caption1 className="inline-flex items-center gap-1.5 text-fg3">
+        <ShieldCheckmarkRegular /> Tidak ada data pribadi siswa, orang tua, atau sekolah yang ditampilkan di halaman ini.
+      </Caption1>
+    </PublicShell>
   );
 }

@@ -1,8 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Body1,
+  Button,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Skeleton,
+  SkeletonItem,
+  Spinner,
+  Subtitle2,
+} from "@fluentui/react-components";
+import { CalendarWeekNumbersRegular, DismissRegular, EditRegular, SendRegular } from "@fluentui/react-icons";
 import { SegmentedRadioGroup } from "@/components/ui/radio-group";
-import { badgeClassForStatus } from "@/components/ui/expandable";
+import { TrafficBadge } from "@/components/ui/expandable";
+import { SectionCard } from "@/components/ui/section-card";
+import { useAppToast } from "@/components/ui/toast";
 import {
   KENDALA_ITEMS,
   OPSI_JAWABAN_KENDALA,
@@ -39,6 +54,7 @@ export function SekolahRefleksiMingguanForm() {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [sukses, setSukses] = useState(false);
+  const toast = useAppToast();
 
   function load() {
     return fetch("/api/sekolah/refleksi-mingguan")
@@ -78,6 +94,7 @@ export function SekolahRefleksiMingguanForm() {
     setBusy(false);
     if (res.ok) {
       setSukses(true);
+      toast("Refleksi minggu ini tersimpan", { body: "Makasih!" });
       await load();
     } else {
       const data = await res.json().catch(() => ({}));
@@ -87,103 +104,100 @@ export function SekolahRefleksiMingguanForm() {
 
   if (loading) {
     return (
-      <div className="border border-neutral-200 rounded-lg p-4">
-        <p className="text-sm text-neutral-500">Memuat refleksi mingguan...</p>
-      </div>
+      <SectionCard title="Refleksi Mingguan" icon={<CalendarWeekNumbersRegular />}>
+        <Skeleton aria-label="Memuat refleksi mingguan">
+          <SkeletonItem size={24} />
+        </Skeleton>
+      </SectionCard>
     );
   }
 
   const sudahIsi = tersimpan != null;
 
   return (
-    <div className="border border-neutral-200 rounded-lg p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="font-medium text-sm">Refleksi Mingguan</p>
-          {periodeMulai && (
-            <p className="text-xs text-neutral-500">Periode {formatPeriode(new Date(periodeMulai))}</p>
-          )}
-        </div>
-        <span className={badgeClassForStatus(sudahIsi ? "hijau" : "kuning")}>
-          {sudahIsi ? "Sudah diisi" : "Belum diisi"}
-        </span>
-      </div>
-
+    <SectionCard
+      title="Refleksi Mingguan"
+      icon={<CalendarWeekNumbersRegular />}
+      description={periodeMulai ? `Periode ${formatPeriode(new Date(periodeMulai))}` : undefined}
+      action={<TrafficBadge status={sudahIsi ? "hijau" : "kuning"}>{sudahIsi ? "Sudah diisi" : "Belum diisi"}</TrafficBadge>}
+    >
       {!terbuka && (
-        <button
-          onClick={() => setTerbuka(true)}
-          className="cursor-pointer text-xs text-neutral-500 underline"
-        >
-          {sudahIsi ? "Lihat / ubah jawaban" : "Isi sekarang"}
-        </button>
+        <div>
+          <Button appearance={sudahIsi ? "secondary" : "primary"} icon={<EditRegular />} onClick={() => setTerbuka(true)}>
+            {sudahIsi ? "Lihat / ubah jawaban" : "Isi sekarang"}
+          </Button>
+        </div>
       )}
 
       {terbuka && (
-        <div className="space-y-5 pt-1">
-          <div className="space-y-3">
-            <p className="text-sm font-medium">
-              Kendala selama seminggu berjalan mengenai kendala pelaksanaan MBG
-            </p>
+        <div className="flex flex-col gap-6 mbg-rise">
+          <fieldset className="flex flex-col gap-4">
+            <legend className="mb-2">
+              <Subtitle2>Kendala selama seminggu berjalan mengenai pelaksanaan MBG</Subtitle2>
+            </legend>
             {KENDALA_ITEMS.map((item, i) => (
-              <div key={item.id} className="space-y-1.5">
-                <p className="text-xs text-neutral-600">
+              <div key={item.id} className="flex flex-col gap-2 rounded-fluent-m border border-stroke2 p-3">
+                <Body1>
                   {i + 1}. {item.pertanyaan}
-                </p>
+                </Body1>
                 <SegmentedRadioGroup<JawabanKendala>
                   value={kendala[item.id] ?? ("" as JawabanKendala)}
                   onChange={(v) => setKendala((prev) => ({ ...prev, [item.id]: v }))}
                   options={OPSI_JAWABAN_KENDALA}
                 />
                 {item.punyaTeksLainnya && kendala[item.id] && kendala[item.id] !== "tidak" && (
-                  <input
-                    value={kendalaLainnyaTeks}
-                    onChange={(e) => setKendalaLainnyaTeks(e.target.value)}
-                    placeholder="Sebutkan..."
-                    className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm"
-                  />
+                  <Field label="Sebutkan">
+                    <Input value={kendalaLainnyaTeks} onChange={(_, d) => setKendalaLainnyaTeks(d.value)} placeholder="Sebutkan..." />
+                  </Field>
                 )}
               </div>
             ))}
-          </div>
+          </fieldset>
 
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Persepsi sekolah berjalannya MBG</p>
+          <fieldset className="flex flex-col gap-4">
+            <legend className="mb-2">
+              <Subtitle2>Persepsi sekolah terhadap berjalannya MBG</Subtitle2>
+            </legend>
             {PERSEPSI_ITEMS.map((item, i) => (
-              <div key={item.id} className="space-y-1.5">
-                <p className="text-xs text-neutral-600">
+              <div key={item.id} className="flex flex-col gap-2 rounded-fluent-m border border-stroke2 p-3">
+                <Body1>
                   {i + 1}. {item.pertanyaan}
-                </p>
+                </Body1>
                 <SegmentedRadioGroup<string>
                   value={persepsi[item.id] != null ? String(persepsi[item.id]) : ""}
-                  onChange={(v) =>
-                    setPersepsi((prev) => ({ ...prev, [item.id]: Number(v) as JawabanPersepsi }))
-                  }
+                  onChange={(v) => setPersepsi((prev) => ({ ...prev, [item.id]: Number(v) as JawabanPersepsi }))}
                   options={OPSI_JAWABAN_PERSEPSI.map((o) => ({ value: String(o.value), label: o.label }))}
                 />
               </div>
             ))}
-          </div>
+          </fieldset>
 
-          {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
-          {sukses && <p className="text-sm text-green-700">Refleksi minggu ini tersimpan. Makasih!</p>}
+          {errorMsg && (
+            <MessageBar layout="multiline" intent="error">
+              <MessageBarBody>{errorMsg}</MessageBarBody>
+            </MessageBar>
+          )}
+          {sukses && (
+            <MessageBar layout="multiline" intent="success">
+              <MessageBarBody>Refleksi minggu ini tersimpan. Makasih!</MessageBarBody>
+            </MessageBar>
+          )}
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => setTerbuka(false)}
-              className="cursor-pointer flex-1 rounded-md border border-neutral-300 text-sm py-2"
-            >
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button icon={<DismissRegular />} onClick={() => setTerbuka(false)}>
               Tutup
-            </button>
-            <button
+            </Button>
+            <Button
+              appearance="primary"
               disabled={!bisaKirim || busy}
               onClick={submit}
-              className="cursor-pointer flex-1 rounded-md bg-neutral-900 text-white text-sm font-medium py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              icon={busy ? <Spinner size="tiny" /> : <SendRegular />}
             >
               {busy ? "Mengirim..." : sudahIsi ? "Simpan Perubahan" : "Kirim"}
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

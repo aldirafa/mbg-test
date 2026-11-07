@@ -1,0 +1,4 @@
+[install]
+# Layout ala pnpm: tiap paket cuma lihat dependency-nya sendiri. File tetap di-clone
+# (copy-on-write) dari cache global Bun, jadi node_modules hampir tidak makan disk.
+linker = "isolated"

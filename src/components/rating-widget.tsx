@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Button, Field, MessageBar, MessageBarBody, Rating, Textarea } from "@fluentui/react-components";
+import { ArrowRepeatAllRegular, CheckmarkCircleRegular, SendRegular } from "@fluentui/react-icons";
 
 // Widget rating berkala (Fase 2, Bagian 6.4) -- dipakai di dashboard Sekolah & Orangtua.
 // `endpoint` beda per peran (server yang resolve sppgId buat Sekolah; Orangtua kirim
@@ -20,8 +22,7 @@ export function RatingWidget({
   extraBody?: Record<string, unknown>;
   label?: string;
 }) {
-  const [skor, setSkor] = useState<number | null>(null);
-  const [hover, setHover] = useState<number | null>(null);
+  const [skor, setSkor] = useState(0);
   const [catatan, setCatatan] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -47,59 +48,42 @@ export function RatingWidget({
 
   function kirimLagi() {
     setDone(false);
-    setSkor(null);
-    setHover(null);
+    setSkor(0);
     setCatatan("");
     setError(null);
   }
 
   if (done) {
     return (
-      <div className="space-y-2">
-        <p className="text-xs text-green-700">Makasih ratingnya!</p>
-        <button
-          onClick={kirimLagi}
-          className="cursor-pointer rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium"
-        >
+      <div className="flex flex-col items-start gap-2 mbg-rise">
+        <MessageBar layout="multiline" intent="success" icon={<CheckmarkCircleRegular />}>
+          <MessageBarBody>Makasih ratingnya!</MessageBarBody>
+        </MessageBar>
+        <Button size="small" icon={<ArrowRepeatAllRegular />} onClick={kirimLagi}>
           Kirim rating lagi
-        </button>
+        </Button>
       </div>
     );
   }
 
-  const tampil = hover ?? skor ?? 0;
-
   return (
-    <div className="space-y-2">
-      <div className="text-xs font-medium text-neutral-700">{label ?? "Kasih rating"}</div>
-      <div className="flex gap-1" onMouseLeave={() => setHover(null)}>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => setSkor(n)}
-            onMouseEnter={() => setHover(n)}
-            className={"cursor-pointer text-xl leading-none transition-opacity " + (n <= tampil ? "" : "opacity-25")}
-            aria-label={`${n} bintang`}
-          >
-            ⭐
-          </button>
-        ))}
+    <div className="flex flex-col gap-3">
+      <Field label={label ?? "Kasih rating"}>
+        <Rating value={skor} onChange={(_, d) => setSkor(d.value)} size="extra-large" color="marigold" />
+      </Field>
+      <Field label="Catatan (opsional)">
+        <Textarea value={catatan} onChange={(_, d) => setCatatan(d.value)} resize="vertical" rows={2} />
+      </Field>
+      {error && (
+        <MessageBar layout="multiline" intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      )}
+      <div>
+        <Button appearance="primary" icon={<SendRegular />} disabled={!skor || busy} onClick={submit}>
+          {busy ? "Mengirim..." : "Kirim Rating"}
+        </Button>
       </div>
-      <textarea
-        value={catatan}
-        onChange={(e) => setCatatan(e.target.value)}
-        placeholder="Catatan (opsional)"
-        className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-xs min-h-14"
-      />
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <button
-        disabled={!skor || busy}
-        onClick={submit}
-        className="cursor-pointer rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        {busy ? "Mengirim..." : "Kirim Rating"}
-      </button>
     </div>
   );
 }

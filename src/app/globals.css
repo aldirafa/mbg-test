@@ -1,26 +1,153 @@
 @import "tailwindcss";
 
+/* Tailwind hanya dipakai untuk layout (flex/grid/gap/spacing/responsive). Warna,
+tipografi, radius, dan shadow datang dari token Fluent UI v9. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Selawik: font open-source (SIL OFL 1.1) dari Microsoft, metrik dibuat cocok dengan
+Segoe UI. Dipakai sebagai fallback ketika Segoe UI tidak terpasang. */
+@font-face {
+  font-family: "Selawik";
+  src: local("Segoe UI Light"), url("/fonts/selawik/selawkl.woff2") format("woff2");
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Selawik";
+  src: local("Segoe UI Semilight"), url("/fonts/selawik/selawksl.woff2") format("woff2");
+  font-weight: 350;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Selawik";
+  src: local("Segoe UI"), url("/fonts/selawik/selawk.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Selawik";
+  src: local("Segoe UI Semibold"), url("/fonts/selawik/selawksb.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Selawik";
+  src: local("Segoe UI Bold"), url("/fonts/selawik/selawkb.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --app-bg: #f5f5f5;
+  /* = colorNeutralBackground3 webLight */
+  --app-fg: #242424;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --app-bg: #141414;
+  /* = colorNeutralBackground3 webDark */
+  --app-fg: #ffffff;
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Segoe UI Variable", "Segoe UI Variable Static Display", "Segoe UI Variable Static Text", "Segoe UI", "Segoe UI Web (West European)", Selawik, -apple-system, BlinkMacSystemFont, Roboto,
+    "Helvetica Neue", sans-serif;
+  --font-mono: "Lilex Nerd Font", "Lilex", "Cascadia Code", Consolas, ui-monospace, SFMono-Regular, monospace;
+  
+  /* Warna semantik = token Fluent (CSS var yang di-set FluentProvider), jadi utilitas
+  seperti text-fg3 / bg-bg2 / border-stroke2 ikut berganti di tema gelap. */
+  --color-fg1: var(--colorNeutralForeground1);
+  --color-fg2: var(--colorNeutralForeground2);
+  --color-fg3: var(--colorNeutralForeground3);
+  --color-fg4: var(--colorNeutralForeground4);
+  --color-fg-disabled: var(--colorNeutralForegroundDisabled);
+  --color-bg1: var(--colorNeutralBackground1);
+  --color-bg2: var(--colorNeutralBackground2);
+  --color-bg3: var(--colorNeutralBackground3);
+  --color-bg4: var(--colorNeutralBackground4);
+  --color-subtle-hover: var(--colorSubtleBackgroundHover);
+  --color-stroke1: var(--colorNeutralStroke1);
+  --color-stroke2: var(--colorNeutralStroke2);
+  --color-stroke3: var(--colorNeutralStroke3);
+  --color-brand: var(--colorBrandForeground1);
+  --color-brand-bg: var(--colorBrandBackground);
+  --color-brand-bg2: var(--colorBrandBackground2);
+  --color-brand-stroke: var(--colorBrandStroke1);
+  --color-on-brand: var(--colorNeutralForegroundOnBrand);
+  --color-success: var(--colorStatusSuccessForeground1);
+  --color-success-bg: var(--colorStatusSuccessBackground1);
+  --color-success-stroke: var(--colorStatusSuccessBorder1);
+  --color-warning: var(--colorStatusWarningForeground1);
+  --color-warning-bg: var(--colorStatusWarningBackground1);
+  --color-warning-stroke: var(--colorStatusWarningBorder1);
+  --color-danger: var(--colorStatusDangerForeground1);
+  --color-danger-bg: var(--colorStatusDangerBackground1);
+  --color-danger-stroke: var(--colorStatusDangerBorder1);
+  --color-info: var(--colorPaletteBlueForeground2);
+  --color-info-bg: var(--colorPaletteBlueBackground2);
+  
+  --radius-fluent-m: var(--borderRadiusMedium);
+  --radius-fluent-l: var(--borderRadiusLarge);
+  --radius-fluent-xl: var(--borderRadiusXLarge);
+  --shadow-fluent-2: var(--shadow2);
+  --shadow-fluent-4: var(--shadow4);
+  --shadow-fluent-8: var(--shadow8);
+  --shadow-fluent-16: var(--shadow16);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html,
+body {
+  background: var(--app-bg);
+  color: var(--app-fg);
+  font-family: var(--font-sans);
+}
+
+/* Animasi masuk halus untuk konten; dimatikan bila pengguna minta reduced motion. */
+@keyframes mbg-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+.mbg-rise {
+  animation: mbg-rise 280ms cubic-bezier(0.1, 0.9, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .mbg-rise {
+    animation: none;
+  }
+}
+
+/* Input/SpinButton/Dropdown Fluent boleh mengecil mengikuti kolom grid (native <input > bawaan punya lebar intrinsik ~ 20ch yang bikin kolom sempit meluap). */
+.fui-Input,
+.fui-SpinButton,
+.fui-Dropdown,
+.fui-Combobox,
+.fui-Textarea {
+  min-width: 0;
+}
+
+.fui-Input .fui-Input__input,
+.fui-SpinButton .fui-SpinButton__input,
+.fui-Combobox .fui-Combobox__input {
+  min-width: 0;
+  width: 100%;
+}
+
+/* Badge Fluent tingginya tetap, jadi teksnya tidak boleh wrap. */
+.fui-Badge {
+  white-space: nowrap;
 }

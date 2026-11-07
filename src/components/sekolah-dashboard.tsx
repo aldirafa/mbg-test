@@ -1,8 +1,46 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Disclosure, DisclosureButton, DisclosurePanel } from "@headlessui/react";
-import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
+import {
+  Badge,
+  Button,
+  Caption1,
+  CounterBadge,
+  Divider,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Skeleton,
+  SkeletonItem,
+  Spinner,
+  SpinButton,
+  Subtitle2,
+  Tab,
+  TabList,
+  Text,
+  Textarea,
+  type BadgeProps,
+} from "@fluentui/react-components";
+import {
+  BoxCheckmarkRegular,
+  CalendarRegular,
+  ChatWarningRegular,
+  CheckmarkCircleRegular,
+  CheckmarkRegular,
+  ClipboardTaskListLtrRegular,
+  ClockRegular,
+  CopyRegular,
+  DismissCircleRegular,
+  DismissRegular,
+  ErrorCircleRegular,
+  FoodRegular,
+  PersonCircleRegular,
+  SendRegular,
+  ShareRegular,
+  StarRegular,
+  VehicleTruckProfileRegular,
+} from "@fluentui/react-icons";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { LokasiSekolahCard } from "@/components/lokasi-sekolah-card";
 import { RatingWidget } from "@/components/rating-widget";
@@ -11,6 +49,10 @@ import { SekolahKebutuhanKhususForm } from "@/components/sekolah-kebutuhan-khusu
 import { SekolahRefleksiMingguanForm } from "@/components/sekolah-refleksi-mingguan-form";
 import { LabeledCheckbox } from "@/components/ui/checkbox";
 import { Expandable } from "@/components/ui/expandable";
+import { SectionCard } from "@/components/ui/section-card";
+import { StatTile } from "@/components/ui/stat-tile";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useAppToast } from "@/components/ui/toast";
 import { RingkasanGiziSiklus } from "@/components/gizi-siklus-summary";
 import { CHECKLIST_BGN } from "@/lib/bgn-checklist";
 import { TZ_OPSI, TZ_TIMEZONE, type Tz, tanggalJamSekarang, tanggalJamTzKeIso } from "@/lib/waktu";
@@ -102,6 +144,36 @@ function draftAwal(d: Distribusi): KonfirmasiDraft {
   };
 }
 
+const STATUS_COLOR: Record<string, BadgeProps["color"]> = {
+  dikirim: "warning",
+  diterima: "success",
+  bermasalah: "danger",
+};
+
+const KETEPATAN_COLOR: Record<KlasifikasiKetepatanWaktu, BadgeProps["color"]> = {
+  tepat_waktu: "success",
+  terlambat_ringan: "warning",
+  terlambat_berat: "danger",
+};
+
+// Input angka (string state) berbasis Fluent SpinButton.
+function AngkaField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <Field label={label}>
+      <SpinButton
+        min={0}
+        value={value === "" ? null : Number(value)}
+        displayValue={value}
+        onChange={(_, d) => {
+          const v = d.value ?? (d.displayValue != null && d.displayValue !== "" ? Number(d.displayValue) : NaN);
+          onChange(Number.isFinite(v) ? String(Math.max(0, v)) : "");
+        }}
+        placeholder="0"
+      />
+    </Field>
+  );
+}
+
 // Checklist pra-penerimaan BGN penuh (9 item wajib + 2 opsional, teks dari tim) --
 // dicentang aktif satu-satu, gak ada yang default tercentang. Item wajib yang gagal
 // (atau gak dicentang sama sekali) memblokir "Diterima" & otomatis diarahkan jadi
@@ -113,10 +185,15 @@ function ChecklistBgnForm({
   jawaban: Record<string, boolean>;
   onChange: (next: Record<string, boolean>) => void;
 }) {
+  const wajib = CHECKLIST_BGN.filter((i) => i.required);
+  const terisi = wajib.filter((i) => jawaban[i.id]).length;
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
+      <Caption1 className="text-fg3">
+        {terisi}/{wajib.length} item wajib dicentang
+      </Caption1>
       {CHECKLIST_BGN.map((item) => (
-        <div key={item.id} className="border border-neutral-100 rounded-md p-2.5">
+        <div key={item.id} className="rounded-fluent-m border border-stroke2 px-2 py-1.5">
           <LabeledCheckbox
             checked={jawaban[item.id] ?? false}
             onChange={(v) => onChange({ ...jawaban, [item.id]: v })}
@@ -124,8 +201,8 @@ function ChecklistBgnForm({
             description={item.required ? undefined : "Opsional"}
           />
           {item.guidance && (
-            <Expandable summary="Lihat panduan" className="mt-1.5 ml-7">
-              <p className="text-xs text-neutral-500">{item.guidance}</p>
+            <Expandable summary="Lihat panduan" className="ml-8">
+              <Caption1 className="text-fg3">{item.guidance}</Caption1>
             </Expandable>
           )}
         </div>
@@ -148,89 +225,52 @@ function KonfirmasiForm({
   error?: string;
 }) {
   return (
-    <div className="space-y-3 border-t border-neutral-200 pt-3">
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-neutral-600">Waktu terima</label>
-        <div className="grid grid-cols-2 gap-2">
-          <input
-            type="date"
-            value={draft.tanggal}
-            onChange={(e) => onChange({ tanggal: e.target.value })}
-            className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm"
-          />
-          <input
-            type="time"
-            value={draft.jam}
-            onChange={(e) => onChange({ jam: e.target.value })}
-            className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm"
-          />
+    <div className="flex flex-col gap-4">
+      <Divider />
+      <Subtitle2 className="inline-flex items-center gap-1.5">
+        <BoxCheckmarkRegular /> Konfirmasi penerimaan
+      </Subtitle2>
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Tanggal terima">
+            <Input type="date" value={draft.tanggal} onChange={(_, d) => onChange({ tanggal: d.value })} />
+          </Field>
+          <Field label="Jam terima">
+            <Input type="time" value={draft.jam} onChange={(_, d) => onChange({ jam: d.value })} />
+          </Field>
         </div>
-        <SegmentedRadioGroup value={draft.tz} onChange={(v) => onChange({ tz: v })} options={[...TZ_OPSI]} className="mt-1" />
-        <p className="text-xs text-neutral-400">
-          Wajib maksimal 4 jam sejak dikirim, kalau lewat otomatis ditandai bermasalah.
-        </p>
+        <SegmentedRadioGroup value={draft.tz} onChange={(v) => onChange({ tz: v })} options={[...TZ_OPSI]} />
+        <Caption1 className="inline-flex items-center gap-1 text-fg3">
+          <ClockRegular /> Wajib maksimal 4 jam sejak dikirim, kalau lewat otomatis ditandai bermasalah.
+        </Caption1>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-neutral-600">Porsi diterima (umum)</label>
-          <input
-            type="number"
-            min={0}
-            value={draft.porsiDiterimaUmum}
-            onChange={(e) => onChange({ porsiDiterimaUmum: e.target.value })}
-            className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-neutral-600">Porsi diterima (khusus)</label>
-          <input
-            type="number"
-            min={0}
-            value={draft.porsiDiterimaKhusus}
-            onChange={(e) => onChange({ porsiDiterimaKhusus: e.target.value })}
-            className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm"
-          />
-        </div>
+      <div className="grid grid-cols-2 gap-3">
+        <AngkaField label="Porsi diterima (umum)" value={draft.porsiDiterimaUmum} onChange={(v) => onChange({ porsiDiterimaUmum: v })} />
+        <AngkaField label="Porsi diterima (khusus)" value={draft.porsiDiterimaKhusus} onChange={(v) => onChange({ porsiDiterimaKhusus: v })} />
+        <AngkaField label="Jumlah layak" value={draft.layakCount} onChange={(v) => onChange({ layakCount: v })} />
+        <AngkaField label="Jumlah tidak layak" value={draft.tidakLayakCount} onChange={(v) => onChange({ tidakLayakCount: v })} />
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-neutral-600">Jumlah layak</label>
-          <input
-            type="number"
-            min={0}
-            value={draft.layakCount}
-            onChange={(e) => onChange({ layakCount: e.target.value })}
-            className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-neutral-600">Jumlah tidak layak</label>
-          <input
-            type="number"
-            min={0}
-            value={draft.tidakLayakCount}
-            onChange={(e) => onChange({ tidakLayakCount: e.target.value })}
-            className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-neutral-600">Checklist pra-penerimaan BGN</label>
+      <Field label="Checklist pra-penerimaan BGN">
         <ChecklistBgnForm jawaban={draft.checklist} onChange={(v) => onChange({ checklist: v })} />
-      </div>
+      </Field>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <MessageBar layout="multiline" intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      )}
 
-      <button
+      <Button
+        appearance="primary"
+        size="large"
         disabled={busy}
         onClick={onSubmit}
-        className="cursor-pointer w-full rounded-md bg-neutral-900 text-white text-sm font-medium py-2 disabled:opacity-60"
+        icon={busy ? <Spinner size="tiny" /> : <CheckmarkRegular />}
       >
         {busy ? "Memproses..." : "Konfirmasi Terima"}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -238,87 +278,58 @@ function KonfirmasiForm({
 function RincianDistribusi({ d, sekolahJenjang }: { d: Distribusi; sekolahJenjang: JenjangBgn | null }) {
   const punyaItems = d.menu.items.length > 0;
   return (
-    <div className="mt-3 pt-3 border-t border-neutral-200 space-y-3">
+    <div className="flex flex-col gap-3">
       {d.menu.fotoUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={d.menu.fotoUrl}
           alt={`Foto menu ${d.menu.nomorMenu ?? ""}`}
-          className="w-full max-h-80 object-contain rounded-md border border-neutral-200 bg-neutral-50"
+          className="max-h-80 w-full rounded-fluent-m border border-stroke2 bg-bg3 object-contain"
         />
       )}
       {punyaItems ? (
         <>
-          <div className="space-y-1.5">
+          <ul className="flex flex-col gap-1.5">
             {d.menu.items.map((it) => (
-              <div key={it.id} className="text-xs border border-neutral-100 rounded-md p-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-neutral-800">{it.namaMenu}</span>
-                  <span className="text-neutral-400">Siklus {it.siklus}</span>
+              <li key={it.id} className="flex items-center justify-between gap-2 rounded-fluent-m border border-stroke2 px-3 py-2">
+                <div className="flex min-w-0 flex-col">
+                  <Text weight="semibold" className="block! truncate">
+                    {it.namaMenu}
+                  </Text>
+                  {it.sumber && <Caption1 className="text-fg3">Sumber: {LABEL_SUMBER_GIZI[it.sumber]}</Caption1>}
                 </div>
-                {it.sumber && <p className="text-neutral-500 mt-0.5">Sumber: {LABEL_SUMBER_GIZI[it.sumber]}</p>}
-              </div>
+                <Badge appearance="outline" color="informative" shape="rounded">
+                  Siklus {it.siklus}
+                </Badge>
+              </li>
             ))}
-          </div>
+          </ul>
           <RingkasanGiziSiklus items={d.menu.items} jenjang={sekolahJenjang} untukWaktu={d.menu.untukWaktu ?? ""} />
         </>
       ) : (
-        d.menu.deskripsi && <p className="text-xs text-neutral-500 italic">{d.menu.deskripsi} (menu lama)</p>
+        d.menu.deskripsi && <Caption1 className="italic text-fg3">{d.menu.deskripsi} (menu lama)</Caption1>
       )}
       {d.checklistBgn && (
         <Expandable summary="Lihat jawaban checklist BGN">
-          <div className="space-y-1">
+          <ul className="flex flex-col gap-1">
             {CHECKLIST_BGN.map((item) => (
-              <div key={item.id} className="flex items-start justify-between gap-2 text-xs">
-                <span className="text-neutral-600">{item.label}</span>
-                <span
-                  className={
-                    d.checklistBgn?.[item.id]
-                      ? "text-green-700 font-medium whitespace-nowrap"
-                      : "text-red-600 font-medium whitespace-nowrap"
-                  }
-                >
-                  {d.checklistBgn?.[item.id] ? "Layak" : "Tidak layak"}
-                </span>
-              </div>
+              <li key={item.id} className="flex items-start justify-between gap-2">
+                <Caption1 className="text-fg2">{item.label}</Caption1>
+                {d.checklistBgn?.[item.id] ? (
+                  <Caption1 className="inline-flex shrink-0 items-center gap-1 font-semibold text-success">
+                    <CheckmarkCircleRegular /> Layak
+                  </Caption1>
+                ) : (
+                  <Caption1 className="inline-flex shrink-0 items-center gap-1 font-semibold text-danger">
+                    <DismissCircleRegular /> Tidak layak
+                  </Caption1>
+                )}
+              </li>
             ))}
-          </div>
+          </ul>
         </Expandable>
       )}
     </div>
-  );
-}
-
-function SeksiRiwayat({
-  label,
-  badgeClass,
-  list,
-  defaultOpen,
-  children,
-}: {
-  label: string;
-  badgeClass: string;
-  list: Distribusi[];
-  defaultOpen: boolean;
-  children: (d: Distribusi) => React.ReactNode;
-}) {
-  return (
-    <Disclosure defaultOpen={defaultOpen} as="div" className="group">
-      <DisclosureButton className="cursor-pointer w-full flex items-center justify-between rounded-lg border border-neutral-200 px-4 py-3 text-sm font-medium hover:bg-neutral-50">
-        <span className="flex items-center gap-2">
-          {label}
-          <span className={`text-xs rounded-full px-2 py-0.5 ${badgeClass}`}>{list.length}</span>
-        </span>
-        <ChevronDownIcon className="size-4 text-neutral-400 transition-transform group-data-open:rotate-180" />
-      </DisclosureButton>
-      <DisclosurePanel className="mt-2 space-y-3">
-        {list.length === 0 ? (
-          <p className="text-xs text-neutral-400 px-1">Tidak ada.</p>
-        ) : (
-          list.map((d) => children(d))
-        )}
-      </DisclosurePanel>
-    </Disclosure>
   );
 }
 
@@ -327,6 +338,9 @@ export function SekolahDashboard() {
   const [jenjang, setJenjang] = useState<JenjangBgn | null>(null);
   const [loading, setLoading] = useState(true);
   const [rowState, setRowState] = useState<Record<string, RowState>>({});
+  const [tab, setTab] = useState<"distribusi" | "profil" | "umpan">("distribusi");
+  const [filter, setFilter] = useState<"menunggu" | "bermasalah" | "diterima">("menunggu");
+  const toast = useAppToast();
 
   function patchRow(id: string, patch: Partial<RowState>) {
     setRowState((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -383,6 +397,7 @@ export function SekolahDashboard() {
     }
     await loadDistribusi();
     patchRow(d.id, { busy: false });
+    toast("Konfirmasi tersimpan", { body: `Status: ${STATUS_LABEL[data.distribusi?.status] ?? "diperbarui"}` });
   }
 
   async function generatePesan(d: Distribusi) {
@@ -414,6 +429,9 @@ export function SekolahDashboard() {
     if (res.ok) {
       await loadDistribusi();
       patchRow(d.id, { komplainOpen: false, komplainText: "" });
+      toast("Komplain terkirim");
+    } else {
+      toast("Gagal mengirim komplain", { intent: "error" });
     }
     patchRow(d.id, { busy: false });
   }
@@ -423,69 +441,44 @@ export function SekolahDashboard() {
     const draft = rs.konfirmasi ?? draftAwal(d);
 
     return (
-      <div key={d.id} className="border border-neutral-200 rounded-lg p-4 text-sm space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-medium">{d.menu.sppg.namaSppg}</div>
-            <div className="text-neutral-500">
+      <SectionCard
+        key={d.id}
+        icon={<VehicleTruckProfileRegular />}
+        title={d.menu.sppg.namaSppg}
+        description={
+          <span className="flex flex-col">
+            <span>
               {d.menu.nomorMenu != null && `Menu ${d.menu.nomorMenu}`}
               {d.menu.untukWaktu && ` · ${d.menu.untukWaktu === "pagi" ? "Makan Pagi" : "Makan Siang"}`}
               {!d.menu.nomorMenu && !d.menu.untukWaktu && (d.menu.deskripsi ?? "")}
-            </div>
-            <div className="text-neutral-400 text-xs mt-1">
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <CalendarRegular />
               {new Date(d.menu.tanggal).toLocaleDateString("id-ID", {
                 weekday: "long",
                 day: "numeric",
                 month: "long",
               })}{" "}
-              &middot; {d.menu.jumlahPorsi} porsi
-            </div>
-            {d.ketepatanWaktu && (
-              <div className="mt-1">
-                <span
-                  className={
-                    "text-xs rounded-full px-2 py-0.5 " +
-                    (d.ketepatanWaktu === "tepat_waktu"
-                      ? "bg-green-50 text-green-700"
-                      : d.ketepatanWaktu === "terlambat_ringan"
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-red-50 text-red-700")
-                  }
-                >
-                  {LABEL_KETEPATAN_WAKTU[d.ketepatanWaktu]}
-                </span>
-              </div>
-            )}
-          </div>
-          <span
-            className={
-              "text-xs rounded-full px-2.5 py-1 whitespace-nowrap " +
-              (d.status === "diterima"
-                ? "bg-green-100 text-green-700"
-                : d.status === "bermasalah"
-                  ? "bg-red-100 text-red-700"
-                  : "bg-amber-100 text-amber-700")
-            }
-          >
-            {STATUS_LABEL[d.status] ?? d.status}
+              · {d.menu.jumlahPorsi} porsi
+            </span>
           </span>
-        </div>
-
-        <button
-          onClick={() => patchRow(d.id, { rincianOpen: !rs.rincianOpen })}
-          className="cursor-pointer flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800"
-        >
-          {rs.rincianOpen ? (
-            <>
-              <ChevronUpIcon className="size-3.5" /> Sembunyikan rincian
-            </>
-          ) : (
-            <>
-              <ChevronDownIcon className="size-3.5" /> Lihat rincian
-            </>
-          )}
-        </button>
-        {rs.rincianOpen && <RincianDistribusi d={d} sekolahJenjang={jenjang} />}
+        }
+        action={
+          <>
+            {d.ketepatanWaktu && (
+              <Badge appearance="outline" color={KETEPATAN_COLOR[d.ketepatanWaktu]} icon={<ClockRegular />} shape="rounded">
+                {LABEL_KETEPATAN_WAKTU[d.ketepatanWaktu]}
+              </Badge>
+            )}
+            <Badge appearance="tint" color={STATUS_COLOR[d.status] ?? "informative"} shape="rounded">
+              {STATUS_LABEL[d.status] ?? d.status}
+            </Badge>
+          </>
+        }
+      >
+        <Expandable summary="Lihat rincian menu">
+          <RincianDistribusi d={d} sekolahJenjang={jenjang} />
+        </Expandable>
 
         {d.status === "dikirim" && (
           <KonfirmasiForm
@@ -498,107 +491,158 @@ export function SekolahDashboard() {
         )}
 
         {d.status === "diterima" && (
-          <div className="space-y-2">
-            <div className="text-xs text-neutral-500">
-              Dikonfirmasi {(d.porsiDiterimaUmum ?? 0) + (d.porsiDiterimaKhusus ?? 0)}/{d.menu.jumlahPorsi} porsi (
-              {d.porsiDiterimaUmum ?? 0} umum, {d.porsiDiterimaKhusus ?? 0} khusus).
-            </div>
+          <div className="flex flex-col gap-2">
+            <MessageBar layout="multiline" intent="success">
+              <MessageBarBody>
+                Dikonfirmasi {(d.porsiDiterimaUmum ?? 0) + (d.porsiDiterimaKhusus ?? 0)}/{d.menu.jumlahPorsi} porsi (
+                {d.porsiDiterimaUmum ?? 0} umum, {d.porsiDiterimaKhusus ?? 0} khusus).
+              </MessageBarBody>
+            </MessageBar>
             {!rs.pesanText && (
-              <button
-                onClick={() => generatePesan(d)}
-                className="cursor-pointer w-full rounded-md bg-neutral-900 text-white text-sm font-medium py-2"
-              >
+              <Button appearance="primary" icon={<ShareRegular />} onClick={() => generatePesan(d)}>
                 Generate Pesan Siap-Bagi
-              </button>
+              </Button>
             )}
             {rs.pesanText && (
               <>
-                <pre className="whitespace-pre-wrap bg-neutral-50 border border-dashed border-neutral-300 rounded-md p-3 text-xs">
+                <pre className="whitespace-pre-wrap rounded-fluent-m border border-dashed border-stroke1 bg-bg2 p-3 font-mono text-xs">
                   {rs.pesanText}
                 </pre>
-                <button
+                <Button
+                  icon={rs.copied ? <CheckmarkRegular /> : <CopyRegular />}
+                  appearance={rs.copied ? "primary" : "secondary"}
                   onClick={() => copyPesan(d.id)}
-                  className="cursor-pointer w-full rounded-md border border-neutral-300 text-sm font-medium py-2"
                 >
                   {rs.copied ? "Tersalin!" : "Salin Teks"}
-                </button>
+                </Button>
               </>
             )}
           </div>
         )}
 
-        {d.status === "bermasalah" && d.catatan && <p className="text-xs text-red-600">Catatan: {d.catatan}</p>}
+        {d.status === "bermasalah" && d.catatan && (
+          <MessageBar layout="multiline" intent="error">
+            <MessageBarBody>Catatan: {d.catatan}</MessageBarBody>
+          </MessageBar>
+        )}
 
         {d.status === "dikirim" && (
           <div>
             {!rs.komplainOpen && (
-              <button onClick={() => patchRow(d.id, { komplainOpen: true })} className="cursor-pointer text-xs text-neutral-500 underline">
+              <Button appearance="subtle" icon={<ChatWarningRegular />} onClick={() => patchRow(d.id, { komplainOpen: true })}>
                 Ajukan komplain
-              </button>
+              </Button>
             )}
             {rs.komplainOpen && (
-              <div className="space-y-2 mt-1">
-                <textarea
-                  className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm min-h-16"
-                  placeholder="Contoh: ayam kurang matang di beberapa porsi..."
-                  value={rs.komplainText ?? ""}
-                  onChange={(e) => patchRow(d.id, { komplainText: e.target.value })}
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => patchRow(d.id, { komplainOpen: false })}
-                    className="cursor-pointer flex-1 rounded-md border border-neutral-300 text-sm py-1.5"
-                  >
+              <div className="flex flex-col gap-2 mbg-rise">
+                <Field label="Isi komplain">
+                  <Textarea
+                    resize="vertical"
+                    placeholder="Contoh: ayam kurang matang di beberapa porsi..."
+                    value={rs.komplainText ?? ""}
+                    onChange={(_, v) => patchRow(d.id, { komplainText: v.value })}
+                  />
+                </Field>
+                <div className="flex justify-end gap-2">
+                  <Button icon={<DismissRegular />} onClick={() => patchRow(d.id, { komplainOpen: false })}>
                     Batal
-                  </button>
-                  <button
-                    disabled={rs.busy}
-                    onClick={() => submitKomplain(d)}
-                    className="cursor-pointer flex-1 rounded-md bg-neutral-900 text-white text-sm py-1.5 disabled:opacity-60"
-                  >
+                  </Button>
+                  <Button appearance="primary" icon={<SendRegular />} disabled={rs.busy} onClick={() => submitKomplain(d)}>
                     Kirim
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
           </div>
         )}
-      </div>
+      </SectionCard>
     );
   }
 
   const menunggu = list.filter((d) => d.status === "dikirim");
   const diterima = list.filter((d) => d.status === "diterima");
   const bermasalah = list.filter((d) => d.status === "bermasalah");
+  const tampil = filter === "menunggu" ? menunggu : filter === "bermasalah" ? bermasalah : diterima;
 
   return (
-    <DashboardShell title="Portal Sekolah" subtitle="Konfirmasi distribusi & bagikan info ke orangtua">
-      <main className="max-w-lg mx-auto p-6 space-y-4">
-        <LokasiSekolahCard />
-        <SekolahKebutuhanKhususForm />
-        <SekolahRefleksiMingguanForm />
-        <div className="border border-neutral-200 rounded-lg p-4">
-          <RatingWidget endpoint="/api/sekolah/rating" label="Kasih rating buat SPPG" />
-        </div>
-        <PengaduanPanel endpoint="/api/sekolah/pengaduan" title="Pengaduan ke SPPG" />
+    <DashboardShell title="Portal Sekolah" subtitle="Konfirmasi distribusi & bagikan info ke orang tua">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatTile label="Menunggu konfirmasi" value={menunggu.length} icon={<ClockRegular />} tone="warning" />
+        <StatTile label="Bermasalah" value={bermasalah.length} icon={<ErrorCircleRegular />} tone="danger" />
+        <StatTile label="Diterima" value={diterima.length} icon={<CheckmarkCircleRegular />} tone="success" />
+      </div>
 
-        {loading && <p className="text-sm text-neutral-500">Memuat...</p>}
-        {!loading && list.length === 0 && <p className="text-sm text-neutral-500">Belum ada distribusi masuk.</p>}
+      <div className="-mx-1 overflow-x-auto">
+        <TabList selectedValue={tab} onTabSelect={(_, d) => setTab(d.value as typeof tab)} size="large">
+          <Tab value="distribusi" icon={<FoodRegular />}>
+            Distribusi
+          </Tab>
+          <Tab value="profil" icon={<PersonCircleRegular />}>
+            Profil & Refleksi
+          </Tab>
+          <Tab value="umpan" icon={<StarRegular />}>
+            Rating & Pengaduan
+          </Tab>
+        </TabList>
+      </div>
 
-        {!loading && list.length > 0 && (
-          <div className="space-y-3">
-            <SeksiRiwayat label="Menunggu Konfirmasi" badgeClass="bg-amber-100 text-amber-700" list={menunggu} defaultOpen>
-              {kartuDistribusi}
-            </SeksiRiwayat>
-            <SeksiRiwayat label="Bermasalah" badgeClass="bg-red-100 text-red-700" list={bermasalah} defaultOpen>
-              {kartuDistribusi}
-            </SeksiRiwayat>
-            <SeksiRiwayat label="Diterima" badgeClass="bg-green-100 text-green-700" list={diterima} defaultOpen={false}>
-              {kartuDistribusi}
-            </SeksiRiwayat>
+      {tab === "distribusi" && (
+        <div className="flex flex-col gap-4">
+          <div className="-mx-1 overflow-x-auto">
+            <TabList
+              appearance="subtle"
+              selectedValue={filter}
+              onTabSelect={(_, d) => setFilter(d.value as typeof filter)}
+            >
+              <Tab value="menunggu">
+                <span className="inline-flex items-center gap-1.5">
+                  Menunggu <CounterBadge count={menunggu.length} size="small" color="informative" showZero />
+                </span>
+              </Tab>
+              <Tab value="bermasalah">
+                <span className="inline-flex items-center gap-1.5">
+                  Bermasalah <CounterBadge count={bermasalah.length} size="small" color="danger" />
+                </span>
+              </Tab>
+              <Tab value="diterima">Diterima</Tab>
+            </TabList>
           </div>
-        )}
-      </main>
+          {loading && (
+            <Skeleton aria-label="Memuat distribusi" className="grid gap-4 lg:grid-cols-2">
+              <SkeletonItem size={128} shape="rectangle" />
+              <SkeletonItem size={128} shape="rectangle" />
+            </Skeleton>
+          )}
+          {!loading && tampil.length === 0 && (
+            <EmptyState
+              icon={<ClipboardTaskListLtrRegular />}
+              title={list.length === 0 ? "Belum ada distribusi masuk" : "Tidak ada distribusi di kategori ini"}
+            />
+          )}
+          {!loading && tampil.length > 0 && (
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">{tampil.map((d) => kartuDistribusi(d))}</div>
+          )}
+        </div>
+      )}
+
+      {tab === "profil" && (
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+          <div className="flex flex-col gap-4">
+            <SekolahRefleksiMingguanForm />
+            <LokasiSekolahCard />
+          </div>
+          <SekolahKebutuhanKhususForm />
+        </div>
+      )}
+
+      {tab === "umpan" && (
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+          <SectionCard title="Rating SPPG" icon={<StarRegular />}>
+            <RatingWidget endpoint="/api/sekolah/rating" label="Kasih rating buat SPPG" />
+          </SectionCard>
+          <PengaduanPanel endpoint="/api/sekolah/pengaduan" title="Pengaduan ke SPPG" />
+        </div>
+      )}
     </DashboardShell>
   );
 }

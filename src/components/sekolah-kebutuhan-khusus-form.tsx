@@ -1,7 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Body1,
+  Button,
+  Caption1,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Skeleton,
+  SkeletonItem,
+  Spinner,
+  SpinButton,
+  Text,
+} from "@fluentui/react-components";
+import { AccessibilityRegular, CheckmarkCircleRegular, InfoRegular, SaveRegular } from "@fluentui/react-icons";
 import { Select, type SelectOption } from "@/components/ui/select";
+import { SectionCard } from "@/components/ui/section-card";
+import { useAppToast } from "@/components/ui/toast";
 import { Expandable } from "@/components/ui/expandable";
 import { KATEGORI_DISABILITAS, KATEGORI_ALERGI, type DataKebutuhanKhusus } from "@/lib/kebutuhan-khusus";
 import { IMPLIKASI_DISABILITAS } from "@/lib/kebutuhan-khusus-implikasi";
@@ -49,29 +66,34 @@ function BarisEntri({
   onChange: (next: EntriDraft) => void;
 }) {
   return (
-    <div className="border border-neutral-100 rounded-md p-2.5">
-      <div className="flex items-center gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-neutral-800">{label}</p>
-          {deskripsi && <p className="text-xs text-neutral-400">{deskripsi}</p>}
+    <div className="flex flex-col gap-2 rounded-fluent-m border border-stroke2 p-3">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <Text weight="semibold" className="block!">
+            {label}
+          </Text>
+          {deskripsi && <Caption1 className="text-fg3">{deskripsi}</Caption1>}
         </div>
-        <input
-          type="number"
+        <SpinButton
+          aria-label={`Jumlah siswa ${label}`}
           min={0}
-          value={entri.jumlah}
-          onChange={(e) => onChange({ ...entri, jumlah: e.target.value })}
+          value={entri.jumlah === "" ? null : Number(entri.jumlah)}
+          displayValue={entri.jumlah}
+          onChange={(_, d) => {
+            const v = d.value ?? (d.displayValue != null ? Number(d.displayValue) : NaN);
+            onChange({ ...entri, jumlah: Number.isFinite(v) && v > 0 ? String(v) : "" });
+          }}
           placeholder="0"
-          className="w-20 rounded-md border border-neutral-300 px-2 py-1.5 text-sm text-right"
+          style={{ width: 96 }}
         />
-        <span className="text-xs text-neutral-400 w-10">siswa</span>
+        <Caption1 className="w-10 text-fg3">siswa</Caption1>
       </div>
       {Number(entri.jumlah) > 0 && (
-        <input
-          type="text"
+        <Input
+          size="small"
           value={entri.catatan}
-          onChange={(e) => onChange({ ...entri, catatan: e.target.value })}
+          onChange={(_, d) => onChange({ ...entri, catatan: d.value })}
           placeholder="Catatan tambahan (opsional)"
-          className="mt-2 w-full rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs"
         />
       )}
     </div>
@@ -89,6 +111,7 @@ export function SekolahKebutuhanKhususForm() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useAppToast();
 
   useEffect(() => {
     fetch("/api/sekolah/kebutuhan-khusus")
@@ -121,29 +144,34 @@ export function SekolahKebutuhanKhususForm() {
       return;
     }
     setSaved(true);
+    toast("Data kebutuhan khusus tersimpan");
     setSaving(false);
   }
 
   if (loading) {
-    return <p className="text-sm text-neutral-500">Memuat data kebutuhan khusus...</p>;
+    return (
+      <SectionCard title="Jenjang & Kebutuhan Khusus Siswa" icon={<AccessibilityRegular />}>
+        <Skeleton aria-label="Memuat data kebutuhan khusus" className="flex flex-col gap-2">
+          <SkeletonItem size={32} />
+          <SkeletonItem size={48} />
+          <SkeletonItem size={48} />
+        </Skeleton>
+      </SectionCard>
+    );
   }
 
   return (
-    <div className="border border-neutral-200 rounded-lg p-4 space-y-4 text-sm">
-      <div>
-        <h2 className="font-medium text-sm">Jenjang & Kebutuhan Khusus Siswa</h2>
-        <p className="text-xs text-neutral-500 mt-0.5">
-          Dipakai SPPG buat nyiapin porsi khusus & menghitung standar gizi yang sesuai.
-        </p>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-sm font-medium">Jenjang pendidikan</label>
-        <Select value={jenjang} onChange={setJenjang} options={JENJANG_OPSI} className="max-w-40" />
-      </div>
+    <SectionCard
+      title="Jenjang & Kebutuhan Khusus Siswa"
+      icon={<AccessibilityRegular />}
+      description="Dipakai SPPG buat nyiapin porsi khusus & menghitung standar gizi yang sesuai."
+    >
+      <Field label="Jenjang pendidikan" className="max-w-56">
+        <Select value={jenjang} onChange={setJenjang} options={JENJANG_OPSI} aria-label="Jenjang pendidikan" />
+      </Field>
 
       <Expandable summary="Data disabilitas (kategori A-E)" defaultOpen>
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {KATEGORI_DISABILITAS.map((k) => (
             <BarisEntri
               key={k.kode}
@@ -157,7 +185,7 @@ export function SekolahKebutuhanKhususForm() {
       </Expandable>
 
       <Expandable summary="Data alergi / pantangan makanan">
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {KATEGORI_ALERGI.map((k) => (
             <BarisEntri
               key={k.kode}
@@ -174,26 +202,26 @@ export function SekolahKebutuhanKhususForm() {
         const alergiAda = KATEGORI_ALERGI.filter((k) => Number(alergi[k.kode]?.jumlah) > 0);
         if (disabilitasAda.length === 0 && alergiAda.length === 0) return null;
         return (
-          <div className="space-y-3 border-t border-neutral-100 pt-3">
-            <p className="text-xs font-medium text-neutral-600">
-              Panduan penyajian &amp; komposisi (berdasarkan data di atas)
-            </p>
+          <div className="flex flex-col gap-3 rounded-fluent-l bg-info-bg p-3">
+            <Text weight="semibold" className="inline-flex items-center gap-1.5 text-info">
+              <InfoRegular /> Panduan penyajian &amp; komposisi (berdasarkan data di atas)
+            </Text>
             {disabilitasAda.length > 0 && (
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 {disabilitasAda.map((k) => {
                   const panduan = IMPLIKASI_DISABILITAS.find((p) => p.kode === k.kode);
                   if (!panduan) return null;
                   return (
                     <Expandable key={k.kode} summary={`${k.kode} · ${k.label}`}>
-                      <div className="text-xs text-neutral-600 pl-4.5 space-y-1">
-                        <p>
-                          <span className="font-medium text-neutral-700">Perhatian mikronutrien &amp; komposisi: </span>
+                      <div className="flex flex-col gap-1 text-fg2">
+                        <Body1>
+                          <span className="font-semibold">Perhatian mikronutrien &amp; komposisi: </span>
                           {panduan.perhatianMikronutrien}
-                        </p>
-                        <p>
-                          <span className="font-medium text-neutral-700">Implikasi penyajian: </span>
+                        </Body1>
+                        <Body1>
+                          <span className="font-semibold">Implikasi penyajian: </span>
                           {panduan.implikasiPenyajian}
-                        </p>
+                        </Body1>
                       </div>
                     </Expandable>
                   );
@@ -201,42 +229,53 @@ export function SekolahKebutuhanKhususForm() {
               </div>
             )}
             {alergiAda.length > 0 && (
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 {alergiAda.map((k) => {
                   const panduan = PANDUAN_ALERGI.find((p) => p.kode === k.kode);
                   if (!panduan) return null;
                   return (
                     <Expandable key={k.kode} summary={k.label}>
-                      <div className="text-xs text-neutral-600 pl-4.5 space-y-1">
-                        <p>
-                          <span className="font-medium text-neutral-700">Perhatian komposisi makanan: </span>
+                      <div className="flex flex-col gap-1 text-fg2">
+                        <Body1>
+                          <span className="font-semibold">Perhatian komposisi makanan: </span>
                           {panduan.perhatianKomposisi}
-                        </p>
-                        <p>
-                          <span className="font-medium text-neutral-700">Pengganti: </span>
+                        </Body1>
+                        <Body1>
+                          <span className="font-semibold">Pengganti: </span>
                           {panduan.pengganti}
-                        </p>
+                        </Body1>
                       </div>
                     </Expandable>
                   );
                 })}
               </div>
             )}
-            <p className="text-[11px] text-neutral-400 italic">{CATATAN_PANDUAN_KHUSUS}</p>
+            <Caption1 className="italic text-fg3">{CATATAN_PANDUAN_KHUSUS}</Caption1>
           </div>
         );
       })()}
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <MessageBar layout="multiline" intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      )}
 
-      <button
-        onClick={simpan}
-        disabled={saving}
-        className="cursor-pointer rounded-md bg-neutral-900 text-white text-sm font-medium py-2 px-4 disabled:opacity-60"
-      >
-        {saving ? "Menyimpan..." : "Simpan"}
-      </button>
-      {saved && <span className="ml-3 text-xs text-green-700">Tersimpan.</span>}
-    </div>
+      <div className="flex items-center gap-3">
+        <Button
+          appearance="primary"
+          onClick={simpan}
+          disabled={saving}
+          icon={saving ? <Spinner size="tiny" /> : <SaveRegular />}
+        >
+          {saving ? "Menyimpan..." : "Simpan"}
+        </Button>
+        {saved && (
+          <Caption1 className="inline-flex items-center gap-1 text-success">
+            <CheckmarkCircleRegular /> Tersimpan
+          </Caption1>
+        )}
+      </div>
+    </SectionCard>
   );
 }

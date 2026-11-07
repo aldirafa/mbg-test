@@ -3,3 +3,8 @@
 export function formatAngkaID(n: number): string {
   return Number.isInteger(n) ? String(n) : String(n).replace(".", ",");
 }
+
+// Tanggal pendek gaya Indonesia, mis. "7 Nov 2026".
+export function formatTanggalPendek(iso: string | Date): string {
+  return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}

@@ -1,6 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Badge,
+  Body1,
+  Button,
+  Caption1,
+  Field,
+  Skeleton,
+  SkeletonItem,
+  Textarea,
+  type BadgeProps,
+} from "@fluentui/react-components";
+import { ChatWarningRegular, SendRegular } from "@fluentui/react-icons";
+import { SectionCard } from "@/components/ui/section-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useAppToast } from "@/components/ui/toast";
+import { formatTanggalPendek } from "@/lib/format";
 
 type PengaduanItem = {
   id: string;
@@ -11,15 +27,10 @@ type PengaduanItem = {
   orangtua?: { nama: string } | null;
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  diterima: "bg-amber-100 text-amber-700",
-  ditindaklanjuti: "bg-blue-100 text-blue-700",
-  selesai: "bg-green-100 text-green-700",
-};
-const STATUS_LABEL: Record<string, string> = {
-  diterima: "Diterima",
-  ditindaklanjuti: "Ditindaklanjuti",
-  selesai: "Selesai",
+const STATUS: Record<string, { label: string; color: BadgeProps["color"] }> = {
+  diterima: { label: "Diterima", color: "warning" },
+  ditindaklanjuti: { label: "Ditindaklanjuti", color: "informative" },
+  selesai: { label: "Selesai", color: "success" },
 };
 
 // Fase 2, Bagian 6.5 -- kanal pengaduan trackable, beda dari komplain ringkas per-distribusi
@@ -42,6 +53,7 @@ export function PengaduanPanel({
   const [isi, setIsi] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const toast = useAppToast();
 
   function load() {
     return fetch(endpoint)
@@ -64,58 +76,70 @@ export function PengaduanPanel({
     });
     if (res.ok) {
       setIsi("");
+      toast("Pengaduan terkirim", { body: "Status bisa dipantau di daftar di bawah." });
       await load();
+    } else {
+      toast("Gagal mengirim pengaduan", { intent: "error" });
     }
     setBusy(false);
   }
 
   return (
-    <div className="border border-neutral-200 rounded-lg p-4 text-sm space-y-3">
-      <h2 className="font-medium text-sm">{title ?? "Pengaduan"}</h2>
-
+    <SectionCard title={title ?? "Pengaduan"} icon={<ChatWarningRegular />}>
       {!readOnly && (
-        <div className="space-y-2">
-          <textarea
-            value={isi}
-            onChange={(e) => setIsi(e.target.value)}
-            placeholder="Ceritain masalahnya..."
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm min-h-16"
-          />
-          <button
-            disabled={busy || !isi.trim()}
-            onClick={submit}
-            className="rounded-md bg-neutral-900 text-white text-xs font-medium px-3 py-1.5 disabled:opacity-60"
-          >
-            {busy ? "Mengirim..." : "Kirim Pengaduan"}
-          </button>
+        <div className="flex flex-col gap-2">
+          <Field label="Isi pengaduan">
+            <Textarea
+              value={isi}
+              onChange={(_, d) => setIsi(d.value)}
+              placeholder="Ceritain masalahnya..."
+              resize="vertical"
+              rows={3}
+            />
+          </Field>
+          <div>
+            <Button
+              appearance="primary"
+              icon={<SendRegular />}
+              disabled={busy || !isi.trim()}
+              onClick={submit}
+            >
+              {busy ? "Mengirim..." : "Kirim Pengaduan"}
+            </Button>
+          </div>
         </div>
       )}
 
-      {loading && <p className="text-xs text-neutral-500">Memuat...</p>}
-      {!loading && list.length === 0 && (
-        <p className="text-xs text-neutral-500">Belum ada pengaduan.</p>
+      {loading && (
+        <Skeleton aria-label="Memuat pengaduan" className="flex flex-col gap-2">
+          <SkeletonItem size={16} />
+          <SkeletonItem size={16} />
+        </Skeleton>
       )}
+      {!loading && list.length === 0 && <EmptyState icon={<ChatWarningRegular />} title="Belum ada pengaduan" />}
       {!loading && list.length > 0 && (
-        <div className="space-y-2 pt-2 border-t border-neutral-200">
-          {list.map((p) => (
-            <div key={p.id} className="flex items-start justify-between gap-2 text-xs">
-              <span className="text-neutral-600 flex-1">
-                {showSubmitter && (
-                  <span className="font-medium text-neutral-800">
-                    {p.sekolah?.namaSekolah ?? p.orangtua?.nama ?? "?"}:{" "}
-                  </span>
-                )}
-                {p.isi}
-              </span>
-              <span
-                className={"rounded-full px-2 py-0.5 flex-shrink-0 " + (STATUS_BADGE[p.status] ?? "")}
-              >
-                {STATUS_LABEL[p.status] ?? p.status}
-              </span>
-            </div>
-          ))}
-        </div>
+        <ul className="flex flex-col divide-y divide-stroke2 border-t border-stroke2">
+          {list.map((p) => {
+            const st = STATUS[p.status] ?? { label: p.status, color: "informative" as const };
+            return (
+              <li key={p.id} className="flex items-start justify-between gap-3 py-2.5">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  {showSubmitter && (
+                    <Caption1 className="font-semibold text-fg2">
+                      {p.sekolah?.namaSekolah ?? p.orangtua?.nama ?? "?"}
+                    </Caption1>
+                  )}
+                  <Body1 className="break-words">{p.isi}</Body1>
+                  <Caption1 className="text-fg3">{formatTanggalPendek(p.createdAt)}</Caption1>
+                </div>
+                <Badge appearance="tint" color={st.color} shape="rounded" className="shrink-0">
+                  {st.label}
+                </Badge>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </div>
+    </SectionCard>
   );
 }

@@ -1,18 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { ComponentType } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
-  ClockIcon,
-  ChartPieIcon,
-  ClipboardDocumentListIcon,
-  FaceSmileIcon,
-  StarIcon,
-  BuildingLibraryIcon,
-} from "@heroicons/react/24/outline";
+  Body1,
+  Caption1,
+  Field,
+  Input,
+  ProgressBar,
+  Skeleton,
+  SkeletonItem,
+  Subtitle2,
+  Text,
+  Tooltip,
+  makeStyles,
+  tokens,
+} from "@fluentui/react-components";
+import {
+  BuildingGovernmentRegular,
+  CheckmarkCircleRegular,
+  ClipboardTaskListLtrRegular,
+  ClockRegular,
+  DataPieRegular,
+  EmojiMehRegular,
+  EmojiRegular,
+  EmojiSadRegular,
+  ErrorCircleRegular,
+  FoodRegular,
+  StarRegular,
+  WarningRegular,
+} from "@fluentui/react-icons";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { SegmentedRadioGroup } from "@/components/ui/radio-group";
 import { Expandable } from "@/components/ui/expandable";
+import { SectionCard } from "@/components/ui/section-card";
+import { StatTile } from "@/components/ui/stat-tile";
 
 // Dashboard statistik Dinas (feedback tim Prof Elly, 20 Sep, "Dashboard dinas,
 // summarised") -- konsumsi GET /api/dinas/analitik. Filter bar + 7 bagian sesuai
@@ -65,25 +86,85 @@ function pct(v: number | null): string {
   return v != null ? `${v}%` : "-";
 }
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  sub?: string;
-}) {
+const useStyles = makeStyles({
+  seg: { height: "12px", minWidth: "4px", transitionProperty: "flex-grow", transitionDuration: tokens.durationSlow },
+  segFirst: { borderTopLeftRadius: "4px", borderBottomLeftRadius: "4px" },
+  segLast: { borderTopRightRadius: "4px", borderBottomRightRadius: "4px" },
+  success: { backgroundColor: tokens.colorStatusSuccessBackground3 },
+  warning: { backgroundColor: tokens.colorStatusWarningBackground3 },
+  danger: { backgroundColor: tokens.colorStatusDangerBackground3 },
+  track: { height: "12px", borderRadius: "4px", backgroundColor: tokens.colorNeutralBackground5 },
+});
+
+function Bagian({ judul, children }: { judul: ReactNode; children: ReactNode }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-neutral-200 px-4 pt-5 pb-4">
-      <div className="absolute rounded-md bg-neutral-900 p-2.5">
-        <Icon className="size-5 text-white" />
+    <section className="flex flex-col gap-3">
+      <Subtitle2 as="h3" className="text-fg2">
+        {judul}
+      </Subtitle2>
+      {children}
+    </section>
+  );
+}
+
+// Bar bertumpuk distribusi ketepatan waktu (status: tepat / terlambat ringan / berat).
+// Warna status + ikon + label di legend, jadi identitas tidak bergantung warna saja.
+function BarKetepatan({ d }: { d: Analitik["ketepatanWaktu"]["distribusi"] }) {
+  const s = useStyles();
+  const segs = [
+    { key: "tepat", label: "Tepat waktu", n: d.tepat_waktu, cls: s.success, icon: <CheckmarkCircleRegular className="text-success" /> },
+    { key: "ringan", label: "Terlambat 15–30 menit", n: d.terlambat_ringan, cls: s.warning, icon: <WarningRegular className="text-warning" /> },
+    { key: "berat", label: "Terlambat > 30 menit", n: d.terlambat_berat, cls: s.danger, icon: <ErrorCircleRegular className="text-danger" /> },
+  ];
+  const total = segs.reduce((a, b) => a + b.n, 0);
+  const visible = segs.filter((x) => x.n > 0);
+  return (
+    <div className="flex flex-col gap-2">
+      {total === 0 ? (
+        <div className={s.track} />
+      ) : (
+        <div className="flex gap-[2px]" role="img" aria-label={segs.map((x) => `${x.label}: ${x.n}`).join(", ")}>
+          {visible.map((x, i) => (
+            <Tooltip
+              key={x.key}
+              relationship="description"
+              content={`${x.label}: ${x.n}x (${Math.round((x.n / total) * 1000) / 10}%)`}
+            >
+              <div
+                className={`${s.seg} ${x.cls} ${i === 0 ? s.segFirst : ""} ${i === visible.length - 1 ? s.segLast : ""}`}
+                style={{ flexGrow: x.n }}
+                tabIndex={0}
+              />
+            </Tooltip>
+          ))}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {segs.map((x) => (
+          <Caption1 key={x.key} className="inline-flex items-center gap-1 text-fg2">
+            {x.icon} {x.label}: <b className="tabular-nums">{x.n}x</b>
+          </Caption1>
+        ))}
       </div>
-      <p className="ml-14 truncate text-xs font-medium text-neutral-500">{label}</p>
-      <p className="ml-14 mt-1 text-xl font-semibold text-neutral-900">{value}</p>
-      {sub && <p className="ml-14 text-xs text-neutral-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+function DaftarTop({ judul, items }: { judul: string; items: { value: string; label: string; jumlah: number }[] }) {
+  const max = Math.max(1, ...items.map((i) => i.jumlah));
+  return (
+    <div className="flex flex-col gap-2 rounded-fluent-m border border-stroke2 p-3">
+      <Text weight="semibold">{judul}</Text>
+      {items.length === 0 && <Caption1 className="text-fg3">Belum ada data.</Caption1>}
+      {items.map((d) => (
+        <div key={d.value} className="flex flex-col gap-1">
+          <div className="flex justify-between gap-2">
+            <Caption1 className="text-fg2">{d.label}</Caption1>
+            <Caption1 className="tabular-nums text-fg3">{d.jumlah}x</Caption1>
+          </div>
+          <ProgressBar value={d.jumlah / max} thickness="medium" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -114,185 +195,145 @@ export function DinasStatistik() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bulan, tahun, jenjang]);
 
+  const kw = data?.ketepatanWaktu;
+  const persenTepat =
+    kw && kw.totalDiklasifikasi > 0 ? Math.round((kw.distribusi.tepat_waktu / kw.totalDiklasifikasi) * 1000) / 10 : null;
+
   return (
-    <div className="border border-neutral-200 rounded-lg p-4 space-y-5">
-      <div>
-        <h2 className="font-medium text-sm">Statistik Program</h2>
-        <p className="text-xs text-neutral-500 mt-0.5">
-          {data ? `${data.totalSekolahCocokFilter} sekolah cocok dengan filter` : "Memuat..."}
-        </p>
+    <SectionCard
+      title="Statistik Program"
+      icon={<DataPieRegular />}
+      description={data ? `${data.totalSekolahCocokFilter} sekolah cocok dengan filter` : "Memuat..."}
+    >
+      <div className="grid grid-cols-1 gap-3 rounded-fluent-l bg-bg2 p-3 sm:grid-cols-2 lg:grid-cols-[1fr_0.6fr_1fr_1fr_auto]">
+        <Field label="Bulan">
+          <Select value={bulan} onChange={setBulan} options={BULAN_OPSI} aria-label="Bulan" />
+        </Field>
+        <Field label="Tahun">
+          <Input type="number" value={tahun} onChange={(_, d) => setTahun(d.value)} onBlur={load} />
+        </Field>
+        <Field label="Provinsi">
+          <Input value={provinsi} onChange={(_, d) => setProvinsi(d.value)} onBlur={load} placeholder="Semua" />
+        </Field>
+        <Field label="Kabupaten/Kota">
+          <Input value={kabupatenKota} onChange={(_, d) => setKabupatenKota(d.value)} onBlur={load} placeholder="Semua" />
+        </Field>
+        <SegmentedRadioGroup label="Jenjang" value={jenjang} onChange={setJenjang} options={JENJANG_OPSI} className="sm:col-span-2 lg:col-span-1" />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-        <Select value={bulan} onChange={setBulan} options={BULAN_OPSI} className="text-sm" />
-        <input
-          value={tahun}
-          onChange={(e) => setTahun(e.target.value)}
-          onBlur={load}
-          className="rounded-md border border-neutral-300 px-2 py-2 text-sm"
-          placeholder="Tahun"
-        />
-        <input
-          value={provinsi}
-          onChange={(e) => setProvinsi(e.target.value)}
-          onBlur={load}
-          className="rounded-md border border-neutral-300 px-2 py-2 text-sm"
-          placeholder="Provinsi"
-        />
-        <input
-          value={kabupatenKota}
-          onChange={(e) => setKabupatenKota(e.target.value)}
-          onBlur={load}
-          className="rounded-md border border-neutral-300 px-2 py-2 text-sm"
-          placeholder="Kabupaten/Kota"
-        />
-        <SegmentedRadioGroup value={jenjang} onChange={setJenjang} options={JENJANG_OPSI} className="col-span-2 sm:col-span-1 flex items-center" />
-      </div>
+      {loading && (
+        <Skeleton aria-label="Memuat statistik" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <SkeletonItem key={i} size={96} shape="rectangle" />
+          ))}
+        </Skeleton>
+      )}
 
-      {loading && <p className="text-sm text-neutral-500">Memuat statistik...</p>}
-
-      {!loading && data && (
-        <div className="space-y-5">
+      {!loading && data && kw && (
+        <div className="flex flex-col gap-6">
           {/* 1. Ketepatan waktu */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">
-              Ketepatan Waktu Distribusi Makanan
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <StatCard
-                icon={ClockIcon}
+          <Bagian judul="Ketepatan Waktu Distribusi Makanan">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <StatTile
+                icon={<ClockRegular />}
                 label="Rata-rata kirim"
-                value={`Pagi ${data.ketepatanWaktu.rataRataJam.kirimPagi ?? "-"}`}
-                sub={`Siang ${data.ketepatanWaktu.rataRataJam.kirimSiang ?? "-"}`}
+                value={`Pagi ${kw.rataRataJam.kirimPagi ?? "-"}`}
+                hint={`Siang ${kw.rataRataJam.kirimSiang ?? "-"}`}
               />
-              <StatCard
-                icon={ClockIcon}
+              <StatTile
+                icon={<ClockRegular />}
                 label="Rata-rata terima"
-                value={`Pagi ${data.ketepatanWaktu.rataRataJam.terimaPagi ?? "-"}`}
-                sub={`Siang ${data.ketepatanWaktu.rataRataJam.terimaSiang ?? "-"}`}
+                value={`Pagi ${kw.rataRataJam.terimaPagi ?? "-"}`}
+                hint={`Siang ${kw.rataRataJam.terimaSiang ?? "-"}`}
               />
-              <StatCard
-                icon={ChartPieIcon}
+              <StatTile
+                icon={<CheckmarkCircleRegular />}
+                tone="success"
                 label="Tepat waktu"
-                value={pct(
-                  data.ketepatanWaktu.totalDiklasifikasi > 0
-                    ? Math.round((data.ketepatanWaktu.distribusi.tepat_waktu / data.ketepatanWaktu.totalDiklasifikasi) * 1000) / 10
-                    : null
-                )}
-                sub={`${data.ketepatanWaktu.distribusi.tepat_waktu} dari ${data.ketepatanWaktu.totalDiklasifikasi} distribusi`}
+                value={pct(persenTepat)}
+                hint={`${kw.distribusi.tepat_waktu} dari ${kw.totalDiklasifikasi} distribusi`}
               />
             </div>
-            <div className="flex flex-wrap gap-3 mt-2 text-xs text-neutral-600">
-              <span>Tepat waktu: {data.ketepatanWaktu.distribusi.tepat_waktu}x</span>
-              <span>Terlambat 15–30 menit: {data.ketepatanWaktu.distribusi.terlambat_ringan}x</span>
-              <span>Terlambat &gt; 30 menit: {data.ketepatanWaktu.distribusi.terlambat_berat}x</span>
-            </div>
-          </div>
+            <BarKetepatan d={kw.distribusi} />
+          </Bagian>
 
-          {/* 2. Porsi bulanan */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">Jumlah Porsi (Bulanan)</p>
-            <StatCard
-              icon={ChartPieIcon}
-              label="Porsi diterima vs dikirim"
+          {/* 2. Porsi bulanan + 3. Refleksi + 5. Orangtua */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StatTile
+              icon={<FoodRegular />}
+              label="Porsi diterima vs dikirim (bulanan)"
               value={pct(data.porsi.persenDiterima)}
-              sub={`${data.porsi.totalDiterima} dari ${data.porsi.totalDikirim} porsi`}
+              hint={`${data.porsi.totalDiterima} dari ${data.porsi.totalDikirim} porsi`}
             />
-          </div>
-
-          {/* 3. Refleksi sekolah */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">
-              Refleksi Mingguan Sekolah
-            </p>
-            <StatCard
-              icon={ClipboardDocumentListIcon}
+            <StatTile
+              icon={<ClipboardTaskListLtrRegular />}
               label="Sekolah mengisi refleksi bulan ini"
               value={pct(data.refleksiSekolah.persenSekolahMengisi)}
             />
-            <Expandable summary="Rincian kendala pelaksanaan MBG" className="mt-2">
-              <div className="space-y-2">
-                {data.refleksiSekolah.kendala.map((k) => (
-                  <div key={k.id} className="text-xs border border-neutral-100 rounded-md p-2">
-                    <p className="text-neutral-700">{k.pertanyaan}</p>
-                    <p className="text-neutral-500 mt-0.5">
-                      Sudah selesai: {pct(k.sudah_diselesaikan)} &middot; Belum selesai: {pct(k.belum_diselesaikan)} &middot;
-                      Tidak: {pct(k.tidak)} ({k.total} respon)
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Expandable>
-            <Expandable summary="Rincian persepsi sekolah" className="mt-2">
-              <div className="space-y-2">
-                {data.refleksiSekolah.persepsi.map((p) => (
-                  <div key={p.id} className="text-xs border border-neutral-100 rounded-md p-2">
-                    <p className="text-neutral-700">{p.pertanyaan}</p>
-                    <p className="text-neutral-500 mt-0.5">
-                      Rata-rata skala 1 (sangat setuju) – 5 (sangat tidak setuju): {p.rataRataSkala1to5 ?? "-"} ({p.total} respon)
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Expandable>
-          </div>
-
-          {/* 4. Data anak (Suara Anak) */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">
-              Data Anak (Suara Anak) &middot; {data.suaraAnak.totalRespon} respon
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard icon={FaceSmileIcon} label="Suka menunya" value={pct(data.suaraAnak.penilaian.suka)} />
-              <StatCard icon={FaceSmileIcon} label="Biasa saja" value={pct(data.suaraAnak.penilaian.biasa)} />
-              <StatCard icon={FaceSmileIcon} label="Tidak suka" value={pct(data.suaraAnak.penilaian.tidak_suka)} />
-              <StatCard icon={ChartPieIcon} label="Makanan habis" value={pct(data.suaraAnak.kondisiHabis.habis)} />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-              <div className="text-xs">
-                <p className="font-medium text-neutral-600 mb-1">Paling sering disukai</p>
-                {data.suaraAnak.topDisukai.length === 0 && <p className="text-neutral-400">Belum ada data.</p>}
-                {data.suaraAnak.topDisukai.map((d) => (
-                  <p key={d.value} className="text-neutral-500">
-                    {d.label} &middot; {d.jumlah}x
-                  </p>
-                ))}
-              </div>
-              <div className="text-xs">
-                <p className="font-medium text-neutral-600 mb-1">Paling sering ingin diperbaiki</p>
-                {data.suaraAnak.topPerbaikan.length === 0 && <p className="text-neutral-400">Belum ada data.</p>}
-                {data.suaraAnak.topPerbaikan.map((d) => (
-                  <p key={d.value} className="text-neutral-500">
-                    {d.label} &middot; {d.jumlah}x
-                  </p>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 5. Data orangtua */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">Data Orangtua</p>
-            <StatCard
-              icon={StarIcon}
-              label="Rata-rata rating dari orangtua"
-              value={data.ratingOrangtua.rataRata != null ? `⭐ ${data.ratingOrangtua.rataRata.toFixed(1)}` : "-"}
-              sub={`${data.ratingOrangtua.totalRating} rating masuk`}
+            <StatTile
+              icon={<StarRegular />}
+              tone="warning"
+              label="Rata-rata rating orang tua"
+              value={data.ratingOrangtua.rataRata != null ? `${data.ratingOrangtua.rataRata.toFixed(1)} / 5` : "-"}
+              hint={`${data.ratingOrangtua.totalRating} rating masuk`}
             />
           </div>
 
-          {/* 6. Data Dinas */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2">Data Dinas</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard icon={BuildingLibraryIcon} label="Sekolah melakukan pelaporan" value={pct(data.dataDinas.persenPelaporan)} />
-              <StatCard icon={BuildingLibraryIcon} label="Sekolah terpantau" value={pct(data.dataDinas.persenTerpantau)} />
-              <StatCard icon={ClipboardDocumentListIcon} label="Kendala ditindaklanjuti" value={pct(data.dataDinas.persenKendalaDitindaklanjuti)} />
-              <StatCard icon={ClipboardDocumentListIcon} label="Laporan diselesaikan" value={pct(data.dataDinas.persenLaporanDiselesaikan)} />
+          {/* 3. Refleksi sekolah (rincian) */}
+          <Bagian judul="Refleksi Mingguan Sekolah">
+            <Expandable summary="Rincian kendala pelaksanaan MBG">
+              <ul className="flex flex-col gap-2">
+                {data.refleksiSekolah.kendala.map((k) => (
+                  <li key={k.id} className="rounded-fluent-m border border-stroke2 p-3">
+                    <Body1>{k.pertanyaan}</Body1>
+                    <Caption1 className="block! mt-1 text-fg3">
+                      Sudah selesai: {pct(k.sudah_diselesaikan)} · Belum selesai: {pct(k.belum_diselesaikan)} · Tidak:{" "}
+                      {pct(k.tidak)} ({k.total} respon)
+                    </Caption1>
+                  </li>
+                ))}
+              </ul>
+            </Expandable>
+            <Expandable summary="Rincian persepsi sekolah">
+              <ul className="flex flex-col gap-2">
+                {data.refleksiSekolah.persepsi.map((p) => (
+                  <li key={p.id} className="rounded-fluent-m border border-stroke2 p-3">
+                    <Body1>{p.pertanyaan}</Body1>
+                    <Caption1 className="block! mt-1 text-fg3">
+                      Rata-rata skala 1 (sangat setuju) – 5 (sangat tidak setuju): {p.rataRataSkala1to5 ?? "-"} ({p.total}{" "}
+                      respon)
+                    </Caption1>
+                  </li>
+                ))}
+              </ul>
+            </Expandable>
+          </Bagian>
+
+          {/* 4. Data anak (Suara Anak) */}
+          <Bagian judul={`Data Anak (Suara Anak) · ${data.suaraAnak.totalRespon} respon`}>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatTile icon={<EmojiRegular />} tone="success" label="Suka menunya" value={pct(data.suaraAnak.penilaian.suka)} />
+              <StatTile icon={<EmojiMehRegular />} tone="neutral" label="Biasa saja" value={pct(data.suaraAnak.penilaian.biasa)} />
+              <StatTile icon={<EmojiSadRegular />} tone="danger" label="Tidak suka" value={pct(data.suaraAnak.penilaian.tidak_suka)} />
+              <StatTile icon={<FoodRegular />} label="Makanan habis" value={pct(data.suaraAnak.kondisiHabis.habis)} />
             </div>
-          </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <DaftarTop judul="Paling sering disukai" items={data.suaraAnak.topDisukai} />
+              <DaftarTop judul="Paling sering ingin diperbaiki" items={data.suaraAnak.topPerbaikan} />
+            </div>
+          </Bagian>
+
+          {/* 6. Data Dinas */}
+          <Bagian judul="Data Dinas">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatTile icon={<BuildingGovernmentRegular />} label="Sekolah melakukan pelaporan" value={pct(data.dataDinas.persenPelaporan)} />
+              <StatTile icon={<BuildingGovernmentRegular />} label="Sekolah terpantau" value={pct(data.dataDinas.persenTerpantau)} />
+              <StatTile icon={<ClipboardTaskListLtrRegular />} label="Kendala ditindaklanjuti" value={pct(data.dataDinas.persenKendalaDitindaklanjuti)} />
+              <StatTile icon={<ClipboardTaskListLtrRegular />} label="Laporan diselesaikan" value={pct(data.dataDinas.persenLaporanDiselesaikan)} />
+            </div>
+          </Bagian>
         </div>
       )}
-    </div>
+    </SectionCard>
   );
 }

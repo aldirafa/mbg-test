@@ -1,6 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Body1,
+  Button,
+  Caption1,
+  MessageBar,
+  MessageBarBody,
+  SkeletonItem,
+  Spinner,
+} from "@fluentui/react-components";
+import { LocationRegular, MyLocationRegular } from "@fluentui/react-icons";
+import { SectionCard } from "@/components/ui/section-card";
 
 // Kartu buat sekolah nge-set titik acuan lokasinya sendiri -- dipakai sbg pusat
 // geo-fence Child Voice Interface (radius 10m, Fase 2). Sekolah bisa juga dibantu/
@@ -58,31 +69,45 @@ export function LokasiSekolahCard() {
   }
 
   return (
-    <div className="border border-neutral-200 rounded-lg p-4 text-sm space-y-2">
-      <h2 className="font-medium text-sm">Titik Lokasi Sekolah</h2>
-      <p className="text-xs text-neutral-500">
-        Dipakai sebagai acuan verifikasi lokasi untuk formulir{" "}
-        <span className="font-medium text-neutral-700">Suara Anak</span> (radius 10m).
-        Set ini sambil berada di lokasi sekolah. Link formulirnya:{" "}
-        <span className="font-mono">/suara-anak</span> -- pasang di QR area makan siswa.
-      </p>
-      {loading && <p className="text-xs text-neutral-500">Memuat...</p>}
-      {!loading && (
-        <p className="text-xs text-neutral-600">
-          {lat != null && lng != null
-            ? `Titik saat ini: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
-            : "Belum diset."}
-        </p>
+    <SectionCard
+      title="Titik Lokasi Sekolah"
+      icon={<LocationRegular />}
+      description={
+        <>
+          Acuan verifikasi lokasi formulir <b>Suara Anak</b> (radius 10m). Set sambil berada di lokasi sekolah. Link
+          formulir: <code className="font-mono">/suara-anak</code>, pasang QR-nya di area makan siswa.
+        </>
+      }
+    >
+      {loading ? (
+        <SkeletonItem size={16} style={{ maxWidth: 240 }} />
+      ) : (
+        <div className="flex flex-col">
+          <Caption1 className="text-fg3">Titik saat ini</Caption1>
+          <Body1 className="font-mono tabular-nums">
+            {lat != null && lng != null ? `${lat.toFixed(6)}, ${lng.toFixed(6)}` : "Belum diset"}
+          </Body1>
+        </div>
       )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      {saved && <p className="text-xs text-green-700">Tersimpan.</p>}
-      <button
-        disabled={busy}
-        onClick={pakaiLokasiSaatIni}
-        className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium disabled:opacity-60"
-      >
-        {busy ? "Mengambil lokasi..." : "Gunakan Lokasi Saat Ini"}
-      </button>
-    </div>
+      {error && (
+        <MessageBar layout="multiline" intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      )}
+      {saved && (
+        <MessageBar layout="multiline" intent="success">
+          <MessageBarBody>Lokasi tersimpan.</MessageBarBody>
+        </MessageBar>
+      )}
+      <div>
+        <Button
+          disabled={busy}
+          onClick={pakaiLokasiSaatIni}
+          icon={busy ? <Spinner size="tiny" /> : <MyLocationRegular />}
+        >
+          {busy ? "Mengambil lokasi..." : "Gunakan Lokasi Saat Ini"}
+        </Button>
+      </div>
+    </SectionCard>
   );
 }
