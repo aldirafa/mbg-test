@@ -18,10 +18,13 @@ export const APP_TOASTER_ID = "mbg-toaster";
 function ThemedFluent({ children }: { children: ReactNode }) {
   const { resolved } = useThemeMode();
   return (
+    // PENTING: jangan taruh className layout di FluentProvider. Fluent menyalin className
+    // provider ke wadah portal (Menu/Popover/Tooltip) lewat applyStylesToPortals, jadi
+    // "min-h-full" dkk. bikin wadah dropdown setinggi layar & menutupi halaman. Layout pakai
+    // `style` (tidak ikut disalin).
     <FluentProvider
       theme={resolved === "dark" ? mbgDarkTheme : mbgLightTheme}
-      className="min-h-full flex flex-col"
-      style={{ background: "transparent" }}
+      style={{ background: "transparent", display: "flex", flexDirection: "column", flex: "1 0 auto", minHeight: "100%" }}
     >
       {children}
       <Toaster toasterId={APP_TOASTER_ID} position="top-end" pauseOnHover pauseOnWindowBlur />

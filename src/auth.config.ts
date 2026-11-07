@@ -14,6 +14,8 @@ export const authConfig = {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const isPublicRoute =
+        // Beranda/landing -- publik, isinya cuma tautan ke portal.
+        nextUrl.pathname === "/" ||
         nextUrl.pathname === "/login" ||
         nextUrl.pathname.startsWith("/api/auth") ||
         // Child Voice Interface (Fase 2) -- publik, tanpa login, diakses lewat QR.

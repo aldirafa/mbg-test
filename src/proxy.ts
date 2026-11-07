@@ -10,5 +10,7 @@ const { auth } = NextAuth(authConfig);
 export default auth;
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.png$).*)"],
+  // Aset statis (font, gambar, dll. di /public) tidak boleh lewat auth -- kalau lewat,
+  // request font kena redirect ke /login & font gagal dimuat untuk pengunjung yang belum login.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|fonts/|.*\\.(?:png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf|txt)$).*)"],
 };
