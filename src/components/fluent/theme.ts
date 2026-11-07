@@ -1,9 +1,10 @@
-import {
-  createDarkTheme,
-  createLightTheme,
-  type BrandVariants,
-  type Theme,
-} from "@fluentui/react-components";
+import
+  {
+    createDarkTheme,
+    createLightTheme,
+    type BrandVariants,
+    type Theme,
+  } from "@fluentui/react-components";
 
 // Ramp brand hijau MBG (gizi/pangan). 10 = paling gelap, 160 = paling terang.
 // Shade 80 dipakai Fluent sbg warna primary di tema terang, 100-110 di tema gelap.
@@ -29,18 +30,33 @@ export const mbgBrand: BrandVariants = {
 // Segoe UI dipakai kalau terpasang di perangkat (Windows), Selawik (self-host, metrik
 // mirip Segoe) jadi fallback resmi di macOS/Linux/Android.
 export const FONT_STACK =
-  '"Segoe UI", "Segoe UI Web (West European)", Selawik, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif';
+  [
+    "'Segoe UI Variable Text'",
+    "'Segoe UI Variable Display'",
+    "'Segoe UI Variable Static Display'",
+    "'Segoe UI Variable'",
+    "'Segoe UI Variable Static Text'",
+    "'Segoe UI'",
+    "var(--font-selawik)",
+    "'Segoe UI Web (West European)'",
+    "-apple-system",
+    "BlinkMacSystemFont",
+    "Roboto",
+    "'Helvetica Neue'",
+    "sans-serif",
+  ].join( ", " );
 
-function withFont(theme: Theme): Theme {
+function withFont ( theme: Theme ): Theme
+{
   return { ...theme, fontFamilyBase: FONT_STACK };
 }
 
-export const mbgLightTheme: Theme = withFont(createLightTheme(mbgBrand));
+export const mbgLightTheme: Theme = withFont( createLightTheme( mbgBrand ) );
 
-const dark = createDarkTheme(mbgBrand);
-export const mbgDarkTheme: Theme = withFont({
+const dark = createDarkTheme( mbgBrand );
+export const mbgDarkTheme: Theme = withFont( {
   ...dark,
   // Rekomendasi Fluent: di tema gelap, foreground brand pakai shade lebih terang.
-  colorBrandForeground1: mbgBrand[110],
-  colorBrandForeground2: mbgBrand[120],
-});
+  colorBrandForeground1: mbgBrand[ 110 ],
+  colorBrandForeground2: mbgBrand[ 120 ],
+} );

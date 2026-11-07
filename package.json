@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "bun@1.4.4",
   "engines": {
-    "node": "22.x"
+    "node": "26.x"
   },
   "scripts": {
     "dev": "next dev",
